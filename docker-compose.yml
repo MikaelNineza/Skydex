@@ -1,0 +1,20 @@
+# Local dev databases: docker compose up -d
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: skydex
+      POSTGRES_USER: skydex
+      POSTGRES_PASSWORD: skydex
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres-data:
