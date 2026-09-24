@@ -37,3 +37,4 @@ google-services.json
 /.idea/deploymentTargetSelector.xml
 /.idea/deploymentTargetDropDown.xml
 /.idea/dbnavigator.xml
+/.claude/settings.local.json
