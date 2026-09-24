@@ -1,0 +1,20 @@
+# Only the server image is built here (SKYDEX_SKIP_APP=true), so keep the context small.
+app/
+.gradle/
+.kotlin/
+**/build/
+.idea/
+.github/
+*.iml
+local.properties
+
+# Secrets must never enter the build context.
+.env
+*.env
+secrets.properties
+*.jks
+*.keystore
+google-services.json
+
+CLAUDE.md
+.claude/
