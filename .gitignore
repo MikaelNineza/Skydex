@@ -26,3 +26,9 @@ google-services.json
 
 # Claude Code
 /CLAUDE.md
+
+# Android release output
+/app/release/
+*.apk
+*.aab
+*.hprof
