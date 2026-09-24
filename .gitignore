@@ -1,20 +1,33 @@
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# Android
+/captures
+.externalNativeBuild
+.cxx
+/app/release/
+*.apk
+*.aab
+*.hprof
+
+# IntelliJ / Android Studio (shared settings like codeStyles stay tracked)
 *.iml
-.gradle
-/local.properties
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/deploymentTargetDropDown.xml
+/.idea/dbnavigator.xml
+
+# OS
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-.kotlin
-build/
+Thumbs.db
 
 # Secrets
 .env
@@ -26,15 +39,4 @@ google-services.json
 
 # Claude Code
 /CLAUDE.md
-
-# Android release output
-/app/release/
-*.apk
-*.aab
-*.hprof
-
-# Personal IDE state
-/.idea/deploymentTargetSelector.xml
-/.idea/deploymentTargetDropDown.xml
-/.idea/dbnavigator.xml
 /.claude/settings.local.json
