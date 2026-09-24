@@ -32,3 +32,8 @@ google-services.json
 *.apk
 *.aab
 *.hprof
+
+# Personal IDE state
+/.idea/deploymentTargetSelector.xml
+/.idea/deploymentTargetDropDown.xml
+/.idea/dbnavigator.xml
