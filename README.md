@@ -2,6 +2,8 @@
 
 An Android app that tracks your Hypixel Skyblock profile and tells you about upcoming events.
 
+> **Work in progress:** Skydex is still being built. Features may be incomplete and things may change or break.
+
 ## Modules
 
 | Module | What it is |
