@@ -39,8 +39,8 @@ android {
 
     buildTypes {
         debug {
-            // The emulator's alias for the host machine, where `./gradlew :server:run` listens.
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/\"")
+            // `./gradlew :server:run` on this machine, forwarded by the adbReverse task below.
+            buildConfigField("String", "BASE_URL", "\"http://localhost:8080/\"")
         }
         release {
             // TODO: point at the deployed server.
@@ -58,6 +58,22 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        // Lets JVM tests run code that logs through android.util.Log.
+        unitTests.isReturnDefaultValues = true
+    }
+}
+
+// Android 17 blocks apps from reaching the host machine (10.0.2.2 or a LAN address) without a local-network
+// permission, but loopback is allowed. So debug builds call localhost:8080 and adb forwards it to this machine,
+// for emulators and USB phones alike. Fails harmlessly when no device is connected.
+val adbReverse = tasks.register<Exec>("adbReverse") {
+    executable = androidComponents.sdkComponents.adb.get().asFile.path
+    args("reverse", "tcp:8080", "tcp:8080")
+    isIgnoreExitValue = true
+}
+tasks.matching { it.name == "assembleDebug" || it.name == "installDebug" }.configureEach {
+    finalizedBy(adbReverse)
 }
 
 dependencies {

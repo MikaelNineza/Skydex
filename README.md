@@ -20,7 +20,7 @@ docker compose up -d          # Postgres + Redis
 ./gradlew :app:installDebug   # app on a connected device or emulator
 ```
 
-The debug app talks to the server at `http://10.0.2.2:8080/` (your machine, as seen from the emulator).
+The debug app talks to `http://localhost:8080/`, which `adb reverse` forwards to the server on your machine (emulator or USB phone). The debug build sets that up automatically; if you restart the emulator, run `adb reverse tcp:8080 tcp:8080` or rebuild.
 
 ## Configuration
 
