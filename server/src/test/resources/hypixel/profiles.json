@@ -22,7 +22,8 @@
               "SKILL_COMBAT": 125.0,
               "SKILL_RUNECRAFTING": 94450.0,
               "SKILL_SOCIAL": 150.0,
-              "SKILL_TAMING": 0
+              "SKILL_TAMING": 0,
+              "SKILL_FORAGING_EXTRA_LEVEL_CAP": 3
             },
             "unlocked_coll_tiers": ["WHEAT_1"]
           },

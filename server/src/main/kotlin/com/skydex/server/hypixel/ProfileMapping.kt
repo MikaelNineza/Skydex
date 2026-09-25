@@ -23,8 +23,9 @@ internal fun summarize(profile: JsonObject): ProfileSummary = ProfileSummary(
 internal fun toSkyblockProfile(profile: JsonObject, uuid: String, username: String, fetchedAt: Long): SkyblockProfile? {
     val member = profile.obj("members")?.obj(uuid) ?: return null
     val skills = member.obj("player_data")?.obj("experience").orEmpty()
-        .filterKeys { it.startsWith("SKILL_") }
-        .map { (key, xp) -> Leveling.skill(key.removePrefix("SKILL_").lowercase(), xp.double() ?: 0.0) }
+        .mapKeys { (key, _) -> key.removePrefix("SKILL_").lowercase() }
+        .filterKeys { it in Leveling.SKILL_CAPS }
+        .map { (name, xp) -> Leveling.skill(name, xp.double() ?: 0.0) }
     val slayers = member.obj("slayer")?.obj("slayer_bosses").orEmpty()
         .map { (boss, data) ->
             val xp = (data as? JsonObject)?.get("xp")?.double()?.toLong() ?: 0L

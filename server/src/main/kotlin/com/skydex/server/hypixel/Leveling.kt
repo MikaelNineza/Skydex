@@ -47,8 +47,11 @@ object Leveling {
         116_250_000,
     )
 
-    /** Max level per skill (lowercase name without `SKILL_`). Skills not listed use the standard table capped at 50. */
-    private val SKILL_CAPS = mapOf(
+    /**
+     * Max level per skill (lowercase name without `SKILL_`). Also the list of real skills: Hypixel stores
+     * bookkeeping values such as `SKILL_FORAGING_EXTRA_LEVEL_CAP` under the same prefix.
+     */
+    val SKILL_CAPS = mapOf(
         "farming" to 60, "mining" to 60, "combat" to 60, "enchanting" to 60, "taming" to 60,
         "foraging" to 57, "fishing" to 50, "alchemy" to 50, "carpentry" to 50, "hunting" to 50,
         "runecrafting" to 25, "social" to 25,
