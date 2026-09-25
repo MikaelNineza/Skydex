@@ -24,6 +24,8 @@ local.properties
 /.idea/deploymentTargetSelector.xml
 /.idea/deploymentTargetDropDown.xml
 /.idea/dbnavigator.xml
+/.idea/deviceManager.xml
+/.idea/studiobot.xml
 
 # OS
 .DS_Store
@@ -36,7 +38,13 @@ secrets.properties
 *.jks
 *.keystore
 google-services.json
+# Firebase service-account keys for the server (FIREBASE_CREDENTIALS)
+*firebase-adminsdk*.json
+service-account*.json
 
-# Claude Code
-/CLAUDE.md
-/.claude/settings.local.json
+# AI agents: instructions, local settings, skills and worktrees stay local
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude/
+.mcp.json
