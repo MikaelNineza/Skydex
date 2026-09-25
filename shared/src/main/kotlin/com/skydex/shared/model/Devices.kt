@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class DeviceRegistration(
+    /** Empty when the device has no push token yet; it then only gets its profile tracked. */
     val fcmToken: String,
     /** Profile the server snapshots for this device's stats history, if any. */
     val trackedUuid: String? = null,

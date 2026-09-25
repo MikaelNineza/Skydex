@@ -36,7 +36,6 @@ class DeviceRepository @Inject constructor(
             DeviceRegistration(
                 // Empty until Firebase registers (the messaging service re-syncs then) or when push isn't
                 // configured, where history tracking still needs a registration.
-                // TODO: confirm with the server that an empty token is accepted.
                 fcmToken = pushTokens.token().orEmpty(),
                 trackedUuid = tracked?.uuid,
                 trackedProfileId = tracked?.profileId,

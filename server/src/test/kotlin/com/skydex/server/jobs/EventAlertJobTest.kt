@@ -53,6 +53,13 @@ class EventAlertJobTest {
     }
 
     @Test
+    fun devicesWithoutTokenGetNoAlerts() {
+        val tokenless = Device("t", DeviceRegistration(fcmToken = "", subscribedEvents = setOf(EventType.DARK_AUCTION)))
+
+        assertEquals(emptyList(), dueAlerts(start, listOf(auction), listOf(tokenless), emptySet()))
+    }
+
+    @Test
     fun alertBodyCountsDownInMinutes() {
         assertEquals("Starts in 5 minutes", alertBody(auction, start - 5 * MINUTE))
         assertEquals("Starts in 5 minutes", alertBody(auction, start - 4 * MINUTE - 1))

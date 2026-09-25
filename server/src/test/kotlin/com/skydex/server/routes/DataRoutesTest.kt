@@ -68,9 +68,14 @@ class DataRoutesTest {
     }
 
     @Test
+    fun trackingOnlyDeviceNeedsNoToken() = routesTest {
+        val body = """{"fcmToken":"","trackedUuid":"$uuid","trackedProfileId":"$profileId"}"""
+        assertEquals(HttpStatusCode.NoContent, putDevice("install-1", body).status)
+    }
+
+    @Test
     fun invalidRegistrationsAreRejected() = routesTest {
         val invalid = listOf(
-            """{"fcmToken":""}""",
             """{"fcmToken":"t","leadMinutes":-1}""",
             """{"fcmToken":"t","trackedUuid":"$uuid"}""",
             """{"fcmToken":"t","trackedUuid":"not-a-uuid","trackedProfileId":"$profileId"}""",

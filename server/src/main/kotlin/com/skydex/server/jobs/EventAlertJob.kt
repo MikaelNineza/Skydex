@@ -20,8 +20,9 @@ val ALERT_GRACE = 2.minutes
 data class DueAlert(val device: Device, val event: SkyblockEvent)
 
 /**
- * The alerts due at [now]: [event][SkyblockEvent] types a device subscribes to, whose lead time has been reached,
- * that started less than [graceMillis] ago at most, and that aren't in [alreadySent].
+ * The alerts due at [now] for devices with a push token: [event][SkyblockEvent] types a device subscribes to,
+ * whose lead time has been reached, that started less than [graceMillis] ago at most, and that aren't in
+ * [alreadySent].
  */
 fun dueAlerts(
     now: Long,
@@ -29,7 +30,7 @@ fun dueAlerts(
     devices: List<Device>,
     alreadySent: Set<SentAlert>,
     graceMillis: Long = ALERT_GRACE.inWholeMilliseconds,
-): List<DueAlert> = devices.flatMap { device ->
+): List<DueAlert> = devices.filter { it.registration.fcmToken.isNotBlank() }.flatMap { device ->
     val registration = device.registration
     events
         .filter { it.type in registration.subscribedEvents }
