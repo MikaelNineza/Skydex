@@ -24,7 +24,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -48,7 +50,11 @@ class TestStore(folder: TemporaryFolder) {
         PreferenceDataStoreFactory.create(scope = scope) { File(folder.newFolder(), "test.preferences_pb") },
     )
 
-    fun close() = scope.cancel()
+    /**
+     * Waits for the cancellation to finish, so ViewModel collectors see it while the test's Main dispatcher
+     * is still set instead of crashing a later test.
+     */
+    fun close() = runBlocking { scope.coroutineContext.job.cancelAndJoin() }
 }
 
 /** A [SkydexApi] backed by Ktor's MockEngine; set [handler] per test and inspect [requests]. */
