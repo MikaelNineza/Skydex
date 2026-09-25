@@ -1,0 +1,79 @@
+{
+  "success": true,
+  "profiles": [
+    {
+      "profile_id": "a1b2c3d4-e5f6-4a1b-8c9d-0e1f2a3b4c5d",
+      "cute_name": "Mango",
+      "selected": true,
+      "community_upgrades": { "currently_upgrading": null, "upgrade_states": [] },
+      "banking": {
+        "balance": 50000000.5,
+        "transactions": [
+          { "amount": 1000000.0, "timestamp": 1758800000000, "action": "DEPOSIT", "initiator_name": "Tester" }
+        ]
+      },
+      "members": {
+        "0f1e2d3c4b5a69788796a5b4c3d2e1f0": {
+          "rift": { "access": { "consumed_prism": true } },
+          "player_data": {
+            "visited_zones": ["village", "hub"],
+            "experience": {
+              "SKILL_FARMING": 55172425.0,
+              "SKILL_COMBAT": 125.0,
+              "SKILL_RUNECRAFTING": 94450.0,
+              "SKILL_SOCIAL": 150.0,
+              "SKILL_TAMING": 0
+            },
+            "unlocked_coll_tiers": ["WHEAT_1"]
+          },
+          "profile": {
+            "first_join": 1600000000000,
+            "bank_account": 0,
+            "personal_bank_upgrade": 2
+          },
+          "leveling": { "experience": 21245, "completions": { "NUCLEUS_RUNS": 3 } },
+          "currencies": {
+            "coin_purse": 1234567.8,
+            "motes_purse": 0.0,
+            "essence": { "WITHER": { "current": 42 } }
+          },
+          "fairy_soul": { "total_collected": 238, "fairy_exchanges": 47, "unspent_souls": 3 },
+          "slayer": {
+            "slayer_quest": { "type": "zombie", "tier": 3 },
+            "slayer_bosses": {
+              "zombie": { "claimed_levels": { "level_1": true }, "boss_kills_tier_0": 12, "xp": 1000000 },
+              "spider": { "claimed_levels": {} },
+              "wolf": { "xp": 250 },
+              "vampire": { "xp": 2400 }
+            }
+          },
+          "dungeons": {
+            "dungeon_types": {
+              "catacombs": { "experience": 4385.0, "tier_completions": { "0": 5, "1": 3 } },
+              "master_catacombs": { "experience": 0 }
+            },
+            "selected_dungeon_class": "mage"
+          },
+          "inventory": { "inv_contents": { "type": 0, "data": "H4sIAAAAAAAAAA==" } }
+        },
+        "1234567890abcdef1234567890abcdef": {
+          "player_data": { "experience": { "SKILL_MINING": 1000.0 } },
+          "leveling": { "experience": 500 },
+          "currencies": { "coin_purse": 10.0 }
+        }
+      }
+    },
+    {
+      "profile_id": "f0e1d2c3-b4a5-4968-8776-5a4b3c2d1e0f",
+      "cute_name": "Kiwi",
+      "game_mode": "ironman",
+      "selected": false,
+      "members": {
+        "0f1e2d3c4b5a69788796a5b4c3d2e1f0": {
+          "leveling": { "experience": 1050 },
+          "currencies": { "coin_purse": 0 }
+        }
+      }
+    }
+  ]
+}
