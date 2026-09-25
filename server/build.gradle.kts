@@ -32,9 +32,15 @@ dependencies {
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.logback.classic)
+    implementation(libs.exposed.core)
+    implementation(libs.exposed.jdbc)
+    implementation(libs.postgresql)
+    implementation(libs.hikaricp)
+    implementation(libs.firebase.admin)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.h2)
 }
 
 tasks.test {

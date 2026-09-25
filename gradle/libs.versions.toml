@@ -13,6 +13,9 @@ ktor = "3.6.0"
 logback = "1.6.3"
 exposed = "1.5.0"
 postgresql = "42.7.13"
+hikaricp = "7.1.0"
+h2 = "2.5.250"
+firebaseAdmin = "9.11.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +48,9 @@ logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.
 exposed-core = { group = "org.jetbrains.exposed", name = "exposed-core", version.ref = "exposed" }
 exposed-jdbc = { group = "org.jetbrains.exposed", name = "exposed-jdbc", version.ref = "exposed" }
 postgresql = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
+hikaricp = { group = "com.zaxxer", name = "HikariCP", version.ref = "hikaricp" }
+h2 = { group = "com.h2database", name = "h2", version.ref = "h2" }
+firebase-admin = { group = "com.google.firebase", name = "firebase-admin", version.ref = "firebaseAdmin" }
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
 
 [plugins]

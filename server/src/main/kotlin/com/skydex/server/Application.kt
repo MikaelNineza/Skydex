@@ -16,4 +16,5 @@ fun Application.module() {
     configureRouting()
     val profileSource = hypixelProfileSource()
     configurePlayerRoutes(profileSource)
+    configureData(profileSource)
 }
