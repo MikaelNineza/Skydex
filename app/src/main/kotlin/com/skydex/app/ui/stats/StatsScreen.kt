@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +21,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydex.app.ui.common.LoadingView
 import com.skydex.app.ui.common.MessageView
+import com.skydex.app.ui.common.SkydexCard
 import com.skydex.app.ui.common.formatCoins
 import com.skydex.shared.model.StatsHistory
 import java.util.Locale
@@ -81,6 +81,7 @@ private fun Charts(history: StatsHistory) {
                 points = history.points.map { ChartPoint(it.takenAt, it.skyblockLevel) },
                 formatValue = { String.format(Locale.ROOT, "%.1f", it) },
                 formatDate = formatDate,
+                color = MaterialTheme.colorScheme.tertiary,
             )
         }
         ChartCard("Purse + bank") {
@@ -95,7 +96,7 @@ private fun Charts(history: StatsHistory) {
 
 @Composable
 private fun ChartCard(title: String, content: @Composable () -> Unit) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+    SkydexCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             content()

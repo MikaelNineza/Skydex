@@ -12,6 +12,7 @@ import com.skydex.shared.model.Mayor
 import com.skydex.shared.model.MayorStatus
 import com.skydex.shared.model.Minister
 import com.skydex.shared.model.Perk
+import com.skydex.shared.model.SkyblockProfile
 import com.skydex.shared.model.StatsHistory
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
@@ -19,6 +20,7 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -113,5 +115,36 @@ class SkydexApiTest {
         server.api.unregisterDevice("install-1")
 
         assertEquals(HttpMethod.Delete, server.requests.single().method)
+    }
+
+    @Test
+    fun `a cached profile from before fairy soul totals and skill averages still decodes`() {
+        val cached = """{"profileId":"p1","cuteName":"Mango","uuid":"abc123","username":"Technoblade",""" +
+            """"skyblockLevel":212.45,"purse":1.0,"bankBalance":null,"fairySouls":240,"skills":[],"slayers":[],""" +
+            """"catacombs":null,"lastSave":null,"fetchedAt":1700000000000}"""
+
+        val profile = SkydexJson.decodeFromString<SkyblockProfile>(cached)
+
+        assertEquals(240, profile.fairySouls)
+        assertEquals(289, profile.fairySoulsTotal)
+        assertNull(profile.skillAverage)
+        // Re-caching keeps the total, so the next read doesn't rely on the default.
+        assertEquals(true, "\"fairySoulsTotal\":289" in SkydexJson.encodeToString(profile))
+    }
+
+    @Test
+    fun `a mayor from a server without last election results still decodes`() = runTest {
+        server.handler = {
+            respondJson(
+                """{"mayor":{"key":"economist","name":"Diaz","perks":[]},"electionYear":515,""" +
+                    """"termStartsAt":1,"termEndsAt":2}""",
+            )
+        }
+
+        val status = server.api.mayor()
+
+        assertEquals(emptyList<Candidate>(), status.lastElectionCandidates)
+        assertEquals(emptyList<Candidate>(), status.candidates)
+        assertNull(status.votingYear)
     }
 }

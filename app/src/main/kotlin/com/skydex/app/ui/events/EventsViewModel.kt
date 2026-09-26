@@ -7,7 +7,6 @@ import com.skydex.app.ui.common.UiState
 import com.skydex.app.ui.common.formatCountdown
 import com.skydex.app.ui.common.userMessage
 import com.skydex.shared.calendar.ActivePerks
-import com.skydex.shared.calendar.SkyblockDate
 import com.skydex.shared.calendar.SkyblockEvents
 import com.skydex.shared.calendar.activePerks
 import com.skydex.shared.calendar.isPerkpocalypse
@@ -45,8 +44,6 @@ data class EventCard(
     val happeningNow: Boolean,
     val status: String,
     val crops: List<Crop>? = null,
-    /** Skyblock date the occurrence starts, e.g. "Early Spring 3rd, Year 516"; used by detail rows. */
-    val dateLabel: String = "",
 )
 
 /** The upcoming occurrences of [type], shown when its card is tapped. */
@@ -59,9 +56,14 @@ sealed interface EventsUiState {
     data object Unavailable : EventsUiState
 
     data class Content(
-        /** Events that come at least once a day, soonest first. */
+        /**
+         * Events that come at least about once a day, soonest first. Perk-dependent events are left out while the
+         * mayor is unknown.
+         */
         val common: List<EventCard>,
-        /** Everything else, soonest first. Perk-dependent events are left out while the mayor is unknown. */
+        /** Events that come at least once per Skyblock year, soonest first. */
+        val seasonal: List<EventCard>,
+        /** Events that come once every few Skyblock years, soonest first. */
         val rare: List<EventCard>,
         val mayor: UiState<MayorStatus>,
         /** Jerry is mayor: perk events can't be predicted. */
@@ -196,13 +198,12 @@ class EventsViewModel internal constructor(
             val detail = selected?.let { type ->
                 EventDetail(
                     type,
-                    upcoming(type, DETAIL_COUNT).map {
-                        it.toCard(now, crops, live.contestsLoaded).copy(dateLabel = SkyblockDate.fromMillis(it.startsAt).format())
-                    },
+                    upcoming(type, DETAIL_COUNT).map { it.toCard(now, crops, live.contestsLoaded) },
                 )
             }
             EventsUiState.Content(
                 common = cards.filter { it.type.category == EventCategory.COMMON },
+                seasonal = cards.filter { it.type.category == EventCategory.SEASONAL },
                 rare = cards.filter { it.type.category == EventCategory.RARE },
                 mayor = live.mayor,
                 perkpocalypse = mayor?.isPerkpocalypse() == true,

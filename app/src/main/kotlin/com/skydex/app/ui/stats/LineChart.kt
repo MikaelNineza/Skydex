@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -28,13 +29,14 @@ fun LineChart(
     formatValue: (Double) -> String,
     formatDate: (Long) -> String,
     modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
 ) {
     if (points.isEmpty()) return
     val minY = points.minOf { it.y }
     val maxY = points.maxOf { it.y }
     val minX = points.first().x
     val maxX = points.last().x
-    val lineColor = MaterialTheme.colorScheme.primary
+    val lineColor = color
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     val labelStyle = MaterialTheme.typography.labelSmall
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant

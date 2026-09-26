@@ -33,3 +33,7 @@ Secrets come from environment variables (server) or `local.properties` (app). Ne
 | `DATABASE_ENABLED` | server | `false` runs without Postgres: no device registration, history or push alerts. |
 | `FIREBASE_CREDENTIALS` | server | Path to a Firebase service-account JSON. Without it, push alerts are only logged. |
 | `FIREBASE_APP_ID`, `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID` | app | Firebase client config. Without them, push notifications are turned off in the app. |
+
+## Credits
+
+Skill, event and crop icons are item renders from SkyCrypt (sky.shiiyu.moe) of Minecraft and Hypixel SkyBlock textures; all rights remain with their respective owners. Contest crop data from elitebot.dev. Skydex is not affiliated with or endorsed by Mojang or Hypixel.

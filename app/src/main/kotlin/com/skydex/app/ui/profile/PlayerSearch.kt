@@ -8,18 +8,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.skydex.app.ui.common.ListDivider
+import com.skydex.app.ui.common.SkydexCard
 import com.skydex.app.ui.common.UiState
 import com.skydex.app.ui.common.titleCase
 import com.skydex.shared.model.PlayerProfiles
@@ -45,7 +46,7 @@ fun PlayerSearch(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     Column(modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Find your Skyblock profile", style = MaterialTheme.typography.titleLarge)
+        Text("Find your Skyblock profile", style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -75,25 +76,40 @@ private fun ProfileList(player: PlayerProfiles, onPick: (PlayerProfiles, Profile
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Text("${player.username}'s profiles", style = MaterialTheme.typography.titleMedium) }
-        items(player.profiles, key = { it.profileId }) { profile ->
-            ElevatedCard(Modifier.fillMaxWidth().clickable { onPick(player, profile) }) {
-                Row(
-                    Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(profile.cuteName, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            profile.gameMode?.titleCase() ?: "Normal",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (profile.selected) {
-                        Badge(containerColor = MaterialTheme.colorScheme.primary) { Text("Last played") }
-                    }
+        item {
+            SkydexCard(Modifier.fillMaxWidth()) {
+                player.profiles.forEachIndexed { index, profile ->
+                    if (index > 0) ListDivider()
+                    ProfileRow(profile, onClick = { onPick(player, profile) })
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileRow(profile: ProfileSummary, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(profile.cuteName, style = MaterialTheme.typography.titleMedium)
+            Text(
+                profile.gameMode?.titleCase() ?: "Normal",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (profile.selected) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                Text(
+                    "Last played",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                )
             }
         }
     }

@@ -11,7 +11,6 @@ import com.skydex.shared.calendar.SkyblockDate
 import com.skydex.shared.calendar.SkyblockEvents
 import com.skydex.shared.calendar.termBounds
 import com.skydex.shared.model.Crop
-import com.skydex.shared.model.EventCategory
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.JacobContest
 import com.skydex.shared.model.Mayor
@@ -61,7 +60,9 @@ class EventsViewModelTest {
 
     private fun EventsViewModel.content() = state.value as EventsUiState.Content
 
-    private fun EventsViewModel.statuses() = content().let { it.common + it.rare }.map { it.status }
+    private fun EventsUiState.Content.cards() = common + seasonal + rare
+
+    private fun EventsViewModel.statuses() = content().cards().map { it.status }
 
     // --- Live data served by a MockEngine on the test scheduler, so requests complete deterministically. ---
 
@@ -139,31 +140,35 @@ class EventsViewModelTest {
     }
 
     @Test
-    fun `one card per event type split into common and rare`() = runTest {
+    fun `one card per event type split into common, seasonal and rare`() = runTest {
         val vm = EventsViewModel(clock(now), null, SkyblockEvents::occurrences)
         backgroundScope.launch { vm.state.collect {} }
         runCurrent()
 
         val content = vm.content()
-        val types = (content.common + content.rare).map { it.type }
+        val types = content.cards().map { it.type }
         assertEquals("one card per type", types.toSet().size, types.size)
-        val gated = setOf(EventType.MINING_FIESTA, EventType.FISHING_FESTIVAL)
         assertEquals(
-            setOf(EventType.DARK_AUCTION, EventType.JACOBS_CONTEST, EventType.CULT_OF_THE_FALLEN_STAR),
+            setOf(
+                EventType.DARK_AUCTION, EventType.JACOBS_CONTEST, EventType.CULT_OF_THE_FALLEN_STAR,
+                EventType.BANK_INTEREST,
+            ),
             content.common.map { it.type }.toSet(),
         )
         assertEquals(
-            EventType.entries.filter { it.category == EventCategory.RARE }.toSet() - gated,
+            setOf(
+                EventType.TRAVELING_ZOO, EventType.SPOOKY_FESTIVAL, EventType.SEASON_OF_JERRY,
+                EventType.NEW_YEAR_CELEBRATION, EventType.JERRYS_WORKSHOP, EventType.HOPPITYS_HUNT,
+                EventType.ELECTION_OPEN, EventType.MAYOR_TERM_CHANGE,
+            ),
+            content.seasonal.map { it.type }.toSet(),
+        )
+        assertEquals(
+            setOf(EventType.YEAR_OF_THE_SEAL, EventType.YEAR_OF_THE_WITCH, EventType.YEAR_OF_THE_PIG),
             content.rare.map { it.type }.toSet(),
         )
-        for (rare in listOf(
-            EventType.SPOOKY_FESTIVAL, EventType.SEASON_OF_JERRY, EventType.JERRYS_WORKSHOP,
-            EventType.NEW_YEAR_CELEBRATION, EventType.YEAR_OF_THE_SEAL, EventType.YEAR_OF_THE_WITCH,
-            EventType.YEAR_OF_THE_PIG, EventType.ELECTION_OPEN, EventType.MAYOR_TERM_CHANGE,
-        )) {
-            assertTrue("$rare in rare", content.rare.any { it.type == rare })
-        }
         assertEquals(content.common.sortedBy { it.next.startsAt }, content.common)
+        assertEquals(content.seasonal.sortedBy { it.next.startsAt }, content.seasonal)
         assertEquals(content.rare.sortedBy { it.next.startsAt }, content.rare)
         // Without live data, gated events stay hidden and the mayor card reports it.
         assertTrue(content.mayor is UiState.Error)
@@ -180,13 +185,22 @@ class EventsViewModelTest {
         val content = vm.content()
         assertEquals(UiState.Content(mayor), content.mayor)
         assertFalse(content.perkpocalypse)
-        assertTrue(content.rare.any { it.type == EventType.MINING_FIESTA })
-        assertFalse((content.common + content.rare).any { it.type == EventType.FISHING_FESTIVAL })
+        // Perk-gated events are Common, not Seasonal or Rare.
+        assertEquals(
+            setOf(
+                EventType.DARK_AUCTION, EventType.JACOBS_CONTEST, EventType.CULT_OF_THE_FALLEN_STAR,
+                EventType.BANK_INTEREST, EventType.MINING_FIESTA,
+            ),
+            content.common.map { it.type }.toSet(),
+        )
+        assertEquals(8, content.seasonal.size)
+        assertEquals(3, content.rare.size)
+        assertFalse(content.cards().any { it.type == EventType.FISHING_FESTIVAL })
         val termStatus = assertNotNullAndGet(content.termStatus)
         assertTrue(termStatus, termStatus.matches(Regex("""Term ends in \d+d \d\dh \d\dm""")))
         val jacob = content.common.single { it.type == EventType.JACOBS_CONTEST }
         assertEquals(contests.first { it.startsAt == jacob.next.startsAt }.crops, jacob.crops)
-        assertTrue((content.common + content.rare).filter { it.type != EventType.JACOBS_CONTEST }.all { it.crops == null })
+        assertTrue(content.cards().filter { it.type != EventType.JACOBS_CONTEST }.all { it.crops == null })
     }
 
     @Test
@@ -202,10 +216,7 @@ class EventsViewModelTest {
         assertEquals(EventsViewModel.DETAIL_COUNT, detail.rows.size)
         assertEquals(10, detail.rows.size)
         assertEquals(detail.rows.sortedBy { it.next.startsAt }, detail.rows)
-        detail.rows.forEach {
-            assertEquals(EventType.JACOBS_CONTEST, it.type)
-            assertEquals(SkyblockDate.fromMillis(it.next.startsAt).format(), it.dateLabel)
-        }
+        detail.rows.forEach { assertEquals(EventType.JACOBS_CONTEST, it.type) }
         // Rows with published crops carry them; the rest are marked as not uploaded yet (empty).
         val cropsByStart = contests.associate { it.startsAt to it.crops }
         detail.rows.forEach { assertEquals(cropsByStart[it.next.startsAt] ?: emptyList<Crop>(), it.crops) }
@@ -222,6 +233,27 @@ class EventsViewModelTest {
     }
 
     @Test
+    fun `cards and detail rows show real time countdowns, never in game dates`() = runTest {
+        val vm = liveViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        runCurrent()
+        // "in 1h 02m 03s" or "Happening now · ends in 4m 05s", and nothing else (e.g. no "Autumn 1st, Year 516").
+        val countdown = """(\d+d \d\dh \d\dm|\d+h \d\dm \d\ds|\d+m \d\ds|\d+s)"""
+        val allowed = Regex("""(in |Happening now · ends in )$countdown""")
+
+        val rows = EventType.entries.flatMap { type ->
+            vm.select(type)
+            runCurrent()
+            vm.content().detail!!.rows
+        } + vm.content().cards()
+
+        assertTrue(rows.isNotEmpty())
+        rows.forEach { assertTrue(it.status, it.status.matches(allowed)) }
+        // The in-game date label is gone from the model, not just hidden.
+        assertFalse(EventCard::class.java.declaredFields.any { it.name == "dateLabel" })
+    }
+
+    @Test
     fun `jerry hides perk events`() = runTest {
         mayor = mayor.copy(mayor = Mayor("jerry", "Jerry", listOf(Perk("Mining Fiesta", "Random"))), minister = null)
         val vm = liveViewModel()
@@ -229,7 +261,7 @@ class EventsViewModelTest {
         runCurrent()
 
         assertTrue(vm.content().perkpocalypse)
-        assertFalse(vm.content().rare.any { it.type == EventType.MINING_FIESTA })
+        assertFalse(vm.content().cards().any { it.type == EventType.MINING_FIESTA })
     }
 
     @Test
@@ -238,7 +270,7 @@ class EventsViewModelTest {
         val vm = EventsViewModel(clock(interest - 2_000), null, SkyblockEvents::occurrences)
         backgroundScope.launch { vm.state.collect {} }
         runCurrent()
-        fun bank() = vm.content().rare.singleOrNull { it.type == EventType.BANK_INTEREST }
+        fun bank() = vm.content().common.singleOrNull { it.type == EventType.BANK_INTEREST }
 
         assertEquals(interest, bank()?.next?.startsAt)
         advanceTimeBy(1_000)
@@ -263,7 +295,7 @@ class EventsViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         runCurrent()
         assertEquals(UiState.Content(mayor), vm.content().mayor)
-        assertTrue(vm.content().rare.any { it.type == EventType.MINING_FIESTA })
+        assertTrue(vm.content().common.any { it.type == EventType.MINING_FIESTA })
         assertEquals("no refetch within five minutes", 2, requests.size)
 
         // A failed refresh keeps the last good mayor.
@@ -290,7 +322,7 @@ class EventsViewModelTest {
         runCurrent()
 
         assertEquals(UiState.Error("Hypixel down"), vm.content().mayor)
-        assertFalse(vm.content().rare.any { it.type == EventType.MINING_FIESTA })
+        assertFalse(vm.content().cards().any { it.type == EventType.MINING_FIESTA })
         // Crops still load without the mayor.
         assertNotNull(vm.content().common.single { it.type == EventType.JACOBS_CONTEST }.crops)
 
@@ -298,7 +330,7 @@ class EventsViewModelTest {
         vm.retryLive()
         runCurrent()
         assertEquals(UiState.Content(mayor), vm.content().mayor)
-        assertTrue(vm.content().rare.any { it.type == EventType.MINING_FIESTA })
+        assertTrue(vm.content().common.any { it.type == EventType.MINING_FIESTA })
     }
 
     @Test
