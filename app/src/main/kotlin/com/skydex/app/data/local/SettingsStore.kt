@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.skydex.app.data.remote.SkydexJson
+import com.skydex.shared.model.Crop
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.SkyblockProfile
 import java.util.UUID
@@ -26,6 +27,8 @@ data class Settings(
     val trackHistory: Boolean = false,
     val subscribedEvents: Set<EventType> = emptySet(),
     val leadMinutes: Int = 5,
+    /** Crops a Jacob's contest must include to be worth a push. Empty = any crop. */
+    val jacobCrops: Set<Crop> = emptySet(),
 )
 
 /** App settings, the device's installation id, and the last fetched profile for offline use. */
@@ -68,6 +71,11 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
         it[EVENTS] = if (enabled) current + type.name else current - type.name
     }
 
+    suspend fun setCropEnabled(crop: Crop, enabled: Boolean) = dataStore.edit {
+        val current = it[JACOB_CROPS].orEmpty()
+        it[JACOB_CROPS] = if (enabled) current + crop.name else current - crop.name
+    }
+
     suspend fun setLeadMinutes(minutes: Int) = dataStore.edit { it[LEAD_MINUTES] = minutes }
 
     /** The last FCM token Firebase handed us, so registration works without asking Firebase again. */
@@ -96,6 +104,9 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
                 .mapNotNull { name -> EventType.entries.find { it.name == name } }
                 .toSet(),
             leadMinutes = this[LEAD_MINUTES] ?: 5,
+            jacobCrops = this[JACOB_CROPS].orEmpty()
+                .mapNotNull { name -> Crop.entries.find { it.name == name } }
+                .toSet(),
         )
     }
 
@@ -108,6 +119,7 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
         val TRACK_HISTORY = booleanPreferencesKey("track_history")
         val EVENTS = stringSetPreferencesKey("subscribed_events")
         val LEAD_MINUTES = intPreferencesKey("lead_minutes")
+        val JACOB_CROPS = stringSetPreferencesKey("jacob_crops")
         val FCM_TOKEN = stringPreferencesKey("fcm_token")
         val INSTALLATION_ID = stringPreferencesKey("installation_id")
     }

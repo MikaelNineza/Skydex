@@ -5,6 +5,7 @@ import com.skydex.app.FakeServer
 import com.skydex.app.TestStore
 import com.skydex.app.data.remote.SkydexJson
 import com.skydex.app.sampleSelection
+import com.skydex.shared.model.Crop
 import com.skydex.shared.model.DeviceRegistration
 import com.skydex.shared.model.EventType
 import io.ktor.client.engine.mock.respond
@@ -50,6 +51,22 @@ class DeviceRepositoryTest {
             DeviceRegistration("fcm-token", "abc123", "p1", setOf(EventType.DARK_AUCTION), 10),
             request.registration(),
         )
+    }
+
+    @Test
+    fun `jacob crops are sent`() = runTest {
+        store.setEventEnabled(EventType.JACOBS_CONTEST, true)
+        store.setCropEnabled(Crop.WHEAT, true)
+        store.setCropEnabled(Crop.COCOA_BEANS, true)
+        store.setCropEnabled(Crop.MELON, true)
+        store.setCropEnabled(Crop.MELON, false)
+
+        repository().sync()
+
+        val sent = server.requests.single().registration()
+        assertEquals(setOf(EventType.JACOBS_CONTEST), sent.subscribedEvents)
+        assertEquals(5, sent.leadMinutes)
+        assertEquals(setOf(Crop.WHEAT, Crop.COCOA_BEANS), sent.jacobCrops)
     }
 
     @Test

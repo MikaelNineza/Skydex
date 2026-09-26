@@ -41,6 +41,7 @@ class DeviceRepository @Inject constructor(
                 trackedProfileId = tracked?.profileId,
                 subscribedEvents = events,
                 leadMinutes = settings.leadMinutes,
+                jacobCrops = settings.jacobCrops,
             ),
         )
     }

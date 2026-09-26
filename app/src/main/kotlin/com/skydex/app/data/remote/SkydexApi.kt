@@ -2,6 +2,8 @@ package com.skydex.app.data.remote
 
 import com.skydex.shared.model.ApiError
 import com.skydex.shared.model.DeviceRegistration
+import com.skydex.shared.model.JacobContest
+import com.skydex.shared.model.MayorStatus
 import com.skydex.shared.model.PlayerProfiles
 import com.skydex.shared.model.SkyblockProfile
 import com.skydex.shared.model.StatsHistory
@@ -48,6 +50,10 @@ class SkydexApi @Inject constructor(private val client: HttpClient) {
         client.get("v1/players/${uuid.path()}/profiles/${profileId.path()}/history") {
             parameter("days", days)
         }.bodyOrThrow()
+
+    suspend fun mayor(): MayorStatus = client.get("v1/mayor").bodyOrThrow()
+
+    suspend fun contests(): List<JacobContest> = client.get("v1/contests").bodyOrThrow()
 
     suspend fun registerDevice(installationId: String, registration: DeviceRegistration) {
         client.put("v1/devices/${installationId.path()}") {

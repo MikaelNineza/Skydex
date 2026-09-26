@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,8 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydex.app.ui.common.LoadingView
+import com.skydex.shared.model.Crop
+import com.skydex.shared.model.EventCategory
 import com.skydex.shared.model.EventType
 
 @Composable
@@ -106,12 +109,19 @@ fun SettingsScreen(
                     )
                 }
             }
-            items(EventType.entries) { type ->
-                SwitchRow(
-                    title = type.displayName,
-                    checked = type in settings.subscribedEvents,
-                    onCheckedChange = { onEventToggle(type, it) },
-                )
+            val groups = listOf(EventCategory.COMMON to "Common", EventCategory.RARE to "Rare & seasonal")
+            for ((category, title) in groups) {
+                item { Text(title, Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleSmall) }
+                items(EventType.entries.filter { it.category == category }) { type ->
+                    SwitchRow(
+                        title = type.displayName,
+                        checked = type in settings.subscribedEvents,
+                        onCheckedChange = { onEventToggle(type, it) },
+                    )
+                    if (type == EventType.JACOBS_CONTEST && type in settings.subscribedEvents) {
+                        CropFilter(settings.jacobCrops, viewModel::setCropEnabled)
+                    }
+                }
             }
             item {
                 Text("Notify me before an event starts", Modifier.padding(top = 8.dp))
@@ -124,6 +134,27 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Which crops a Jacob's contest must include to be worth a push. */
+@Composable
+private fun CropFilter(selected: Set<Crop>, onToggle: (Crop, Boolean) -> Unit) {
+    Column(Modifier.padding(start = 16.dp)) {
+        Text(
+            "No crops selected = any crop",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (crop in Crop.entries) {
+                FilterChip(
+                    selected = crop in selected,
+                    onClick = { onToggle(crop, crop !in selected) },
+                    label = { Text(crop.displayName) },
+                )
             }
         }
     }
