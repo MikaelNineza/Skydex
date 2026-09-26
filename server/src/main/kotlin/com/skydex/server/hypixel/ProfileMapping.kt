@@ -1,6 +1,7 @@
 package com.skydex.server.hypixel
 
 import com.skydex.shared.model.ProfileSummary
+import com.skydex.shared.model.Skills
 import com.skydex.shared.model.SkyblockProfile
 import com.skydex.shared.model.SlayerLevel
 import kotlinx.serialization.json.JsonElement
@@ -42,7 +43,9 @@ internal fun toSkyblockProfile(profile: JsonObject, uuid: String, username: Stri
         purse = member.obj("currencies")?.get("coin_purse")?.double() ?: 0.0,
         bankBalance = profile.obj("banking")?.get("balance")?.double(),
         fairySouls = member.obj("fairy_soul")?.get("total_collected")?.double()?.toInt() ?: 0,
+        fairySoulsTotal = Leveling.FAIRY_SOULS_TOTAL,
         skills = skills,
+        skillAverage = Skills.average(skills),
         slayers = slayers,
         catacombs = catacombsXp?.let(Leveling::catacombs),
         lastSave = null, // v2 no longer reports a member's last save.

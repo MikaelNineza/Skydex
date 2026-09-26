@@ -56,6 +56,10 @@ class HypixelProfileSourceTest {
         assertEquals(1234567.8, profile.purse)
         assertEquals(50000000.5, profile.bankBalance)
         assertEquals(238, profile.fairySouls)
+        assertEquals(Leveling.FAIRY_SOULS_TOTAL, profile.fairySoulsTotal)
+        assertEquals(289, profile.fairySoulsTotal)
+        // (farming 50 + combat 1.6 + taming 0) / 10; runecrafting and social are cosmetic.
+        assertEquals(5.16, profile.skillAverage!!, 1e-9)
         assertEquals(now, profile.fetchedAt)
         assertEquals(
             listOf(
@@ -90,7 +94,9 @@ class HypixelProfileSourceTest {
         assertNull(profile.bankBalance)
         assertNull(profile.catacombs)
         assertEquals(0, profile.fairySouls)
+        assertEquals(Leveling.FAIRY_SOULS_TOTAL, profile.fairySoulsTotal)
         assertEquals(emptyList(), profile.skills)
+        assertEquals(0.0, profile.skillAverage!!, 1e-9)
     }
 
     @Test

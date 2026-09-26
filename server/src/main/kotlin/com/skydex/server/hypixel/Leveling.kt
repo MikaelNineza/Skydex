@@ -1,6 +1,7 @@
 package com.skydex.server.hypixel
 
 import com.skydex.shared.model.SkillLevel
+import com.skydex.shared.model.Skills
 
 /**
  * Skyblock XP tables and level math.
@@ -47,15 +48,11 @@ object Leveling {
         116_250_000,
     )
 
-    /**
-     * Max level per skill (lowercase name without `SKILL_`). Also the list of real skills: Hypixel stores
-     * bookkeeping values such as `SKILL_FORAGING_EXTRA_LEVEL_CAP` under the same prefix.
-     */
-    val SKILL_CAPS = mapOf(
-        "farming" to 60, "mining" to 60, "combat" to 60, "enchanting" to 60, "taming" to 60,
-        "foraging" to 57, "fishing" to 50, "alchemy" to 50, "carpentry" to 50, "hunting" to 50,
-        "runecrafting" to 25, "social" to 25,
-    )
+    /** Fairy souls in the game; the server sends it as [com.skydex.shared.model.SkyblockProfile.fairySoulsTotal]. */
+    const val FAIRY_SOULS_TOTAL = 289
+
+    /** Max level per skill (lowercase name without `SKILL_`); see [Skills.CAPS]. */
+    val SKILL_CAPS: Map<String, Int> = Skills.CAPS
 
     /** Cumulative XP needed for each slayer level, starting at level 1. */
     val SLAYER_XP: Map<String, List<Long>> = mapOf(
