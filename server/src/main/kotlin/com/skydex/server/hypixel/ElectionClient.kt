@@ -20,6 +20,9 @@ private val FORMATTING_CODE = Regex("§.")
 /** How many Skyblock years the election year may be from the current one before we distrust it. */
 private const val MAX_YEAR_SKEW = 2
 
+/** Elections have five candidates; cap what we pass on in case the upstream list balloons. */
+private const val MAX_CANDIDATES = 10
+
 /** Reads the current mayor and election from Hypixel's public election resource. Needs no API key. */
 class ElectionClient(
     private val http: HttpClient,
@@ -79,13 +82,17 @@ class ElectionClient(
             termStartsAt = termStartsAt,
             termEndsAt = termEndsAt,
             votingYear = raw.current?.year,
-            candidates = raw.current?.candidates.orEmpty().map { candidate ->
-                Candidate(candidate.key, candidate.name.stripFormatting(), candidate.perks.map { it.toPerk() }, candidate.votes)
-            },
+            candidates = raw.current?.candidates.orEmpty().take(MAX_CANDIDATES).map { it.toCandidate() },
+            // The app only shows past results' names and votes, so their perks aren't worth sending.
+            lastElectionCandidates = mayor.election.candidates.take(MAX_CANDIDATES)
+                .map { it.toCandidate().copy(perks = emptyList()) },
         )
     }
 
     private fun String.stripFormatting() = replace(FORMATTING_CODE, "")
+
+    private fun RawCandidate.toCandidate() =
+        Candidate(key, name.stripFormatting(), perks.map { it.toPerk() }, votes.coerceAtLeast(0))
 
     private fun RawPerk.toPerk() = Perk(
         name = name.stripFormatting(),

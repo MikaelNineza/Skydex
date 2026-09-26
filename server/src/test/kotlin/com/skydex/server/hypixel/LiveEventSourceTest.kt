@@ -3,6 +3,7 @@ package com.skydex.server.hypixel
 import com.skydex.shared.calendar.SkyblockDate
 import com.skydex.shared.calendar.activePerks
 import com.skydex.shared.calendar.termBounds
+import com.skydex.shared.model.Candidate
 import com.skydex.shared.model.Crop
 import com.skydex.shared.model.JacobContest
 import com.skydex.shared.model.Perk
@@ -61,8 +62,16 @@ class LiveEventSourceTest {
         assertEquals(516, status.votingYear)
         assertEquals(listOf("Diana", "Finnegan", "Marina", "Foxy", "Cole"), status.candidates.map { it.name })
         assertEquals(62133L, status.candidates[0].votes)
+        // The last election (the one Diaz won) keeps Hypixel's order and final votes, without perks.
+        assertEquals(
+            listOf("Cole", "Diana", "Paul", "Diaz", "Foxy"),
+            status.lastElectionCandidates.map { it.name },
+        )
+        assertEquals(529099L, status.lastElectionCandidates.single { it.key == "economist" }.votes)
+        assertTrue(status.lastElectionCandidates.all { it.perks.isEmpty() })
         val allText = (status.mayor.perks + status.minister!!.perk + status.candidates.flatMap { it.perks })
-            .flatMap { listOf(it.name, it.description) }
+            .flatMap { listOf(it.name, it.description) } +
+            (status.candidates + status.lastElectionCandidates).map { it.name }
         assertTrue(allText.none { '§' in it }, "formatting codes left: ${allText.filter { '§' in it }}")
         // Cole's minister perk makes Mining Fiestas active for the term.
         assertTrue(status.activePerks().miningFiesta)
@@ -72,7 +81,8 @@ class LiveEventSourceTest {
     fun electionWithoutOpenBoothHasNoCandidatesAndStripsNames() = runBlocking<Unit> {
         val body = """{"success":true,"mayor":{"key":"fishing","name":"§bMarina","perks":[""" +
             """{"name":"§aFishing Festival","description":"Start a §6Fishing Festival§7!","minister":false}],""" +
-            """"election":{"year":515,"candidates":[{"key":"fishing","name":"Marina","perks":[],"votes":1}]}}}"""
+            """"election":{"year":515,"candidates":[{"key":"fishing","name":"§bMarina","perks":[""" +
+            """{"name":"§aFishing Festival","description":"Start one.","minister":false}],"votes":1}]}}}"""
         val (_, http) = mockHttp { respond(body, headers = json) }
 
         val status = ElectionClient(http, clock = { YEAR_516 }).election()
@@ -82,7 +92,26 @@ class LiveEventSourceTest {
         assertNull(status.minister)
         assertNull(status.votingYear)
         assertEquals(emptyList(), status.candidates, "past election's candidates must not be shown")
+        assertEquals(listOf(Candidate("fishing", "Marina", emptyList(), 1)), status.lastElectionCandidates)
         assertTrue(status.activePerks().fishingFestival)
+    }
+
+    @Test
+    fun electionCandidateListsAreCappedAndVotesClamped() = runBlocking<Unit> {
+        fun candidates(n: Int, votes: (Int) -> Long) = (1..n).joinToString(",") {
+            """{"key":"k$it","name":"C$it","perks":[],"votes":${votes(it)}}"""
+        }
+        val body = """{"success":true,"mayor":{"key":"fishing","name":"Marina","perks":[],""" +
+            """"election":{"year":515,"candidates":[${candidates(12) { if (it == 1) -5 else it.toLong() }}]}},""" +
+            """"current":{"year":516,"candidates":[${candidates(15) { -it.toLong() }}]}}"""
+        val (_, http) = mockHttp { respond(body, headers = json) }
+
+        val status = ElectionClient(http, clock = { YEAR_516 }).election()
+
+        assertEquals((1..10).map { "C$it" }, status.candidates.map { it.name })
+        assertTrue(status.candidates.all { it.votes == 0L }, "negative votes: ${status.candidates.map { it.votes }}")
+        assertEquals((1..10).map { "C$it" }, status.lastElectionCandidates.map { it.name })
+        assertEquals(listOf(0L) + (2..10).map { it.toLong() }, status.lastElectionCandidates.map { it.votes })
     }
 
     @Test

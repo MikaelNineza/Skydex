@@ -50,4 +50,6 @@ data class MayorStatus(
     val votingYear: Int? = null,
     /** Candidates of the open election; empty when the booth is closed. */
     val candidates: List<Candidate> = emptyList(),
+    /** Final results of election [electionYear] (the one the mayor won), in Hypixel's order; empty from older servers. */
+    val lastElectionCandidates: List<Candidate> = emptyList(),
 )
