@@ -4,6 +4,7 @@ import com.skydex.server.db.DeviceRepository
 import com.skydex.server.db.SnapshotRepository
 import com.skydex.server.db.testDatabase
 import com.skydex.server.plugins.configureSerialization
+import com.skydex.shared.model.Crop
 import com.skydex.shared.model.DeviceRegistration
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.StatPoint
@@ -68,6 +69,18 @@ class DataRoutesTest {
     }
 
     @Test
+    fun unknownEventsAndCropsFromANewerAppAreDropped() = routesTest {
+        val body = """{"fcmToken":"t","subscribedEvents":["DARK_AUCTION","SOME_FUTURE_EVENT"],""" +
+            """"jacobCrops":["WHEAT","FUTURE_CROP"],"someNewField":true}"""
+
+        assertEquals(HttpStatusCode.NoContent, putDevice("install-1", body).status)
+        assertEquals(
+            DeviceRegistration("t", subscribedEvents = setOf(EventType.DARK_AUCTION), jacobCrops = setOf(Crop.WHEAT)),
+            devices.find("install-1")?.registration,
+        )
+    }
+
+    @Test
     fun trackingOnlyDeviceNeedsNoToken() = routesTest {
         val body = """{"fcmToken":"","trackedUuid":"$uuid","trackedProfileId":"$profileId"}"""
         assertEquals(HttpStatusCode.NoContent, putDevice("install-1", body).status)
@@ -79,7 +92,8 @@ class DataRoutesTest {
             """{"fcmToken":"t","leadMinutes":-1}""",
             """{"fcmToken":"t","trackedUuid":"$uuid"}""",
             """{"fcmToken":"t","trackedUuid":"not-a-uuid","trackedProfileId":"$profileId"}""",
-            """{"fcmToken":"t","subscribedEvents":["NOT_AN_EVENT"]}""",
+            // Unknown event names are dropped (a newer app), but the field must still be a list.
+            """{"fcmToken":"t","subscribedEvents":"DARK_AUCTION"}""",
             """not json""",
         )
         for (body in invalid) {
