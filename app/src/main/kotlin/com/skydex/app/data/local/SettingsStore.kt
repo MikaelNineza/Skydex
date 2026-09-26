@@ -2,12 +2,12 @@ package com.skydex.app.data.local
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.skydex.app.data.remote.SkydexJson
+import com.skydex.shared.model.Crop
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.SkyblockProfile
 import java.util.UUID
@@ -23,9 +23,10 @@ data class Selection(val uuid: String, val username: String, val profileId: Stri
 
 data class Settings(
     val selection: Selection? = null,
-    val trackHistory: Boolean = false,
     val subscribedEvents: Set<EventType> = emptySet(),
     val leadMinutes: Int = 5,
+    /** Crops a Jacob's contest must include to be worth a push. Empty = any crop. */
+    val jacobCrops: Set<Crop> = emptySet(),
 )
 
 /** App settings, the device's installation id, and the last fetched profile for offline use. */
@@ -61,11 +62,14 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
         it[CACHED_PROFILE] = SkydexJson.encodeToString(profile)
     }
 
-    suspend fun setTrackHistory(enabled: Boolean) = dataStore.edit { it[TRACK_HISTORY] = enabled }
-
     suspend fun setEventEnabled(type: EventType, enabled: Boolean) = dataStore.edit {
         val current = it[EVENTS].orEmpty()
         it[EVENTS] = if (enabled) current + type.name else current - type.name
+    }
+
+    suspend fun setCropEnabled(crop: Crop, enabled: Boolean) = dataStore.edit {
+        val current = it[JACOB_CROPS].orEmpty()
+        it[JACOB_CROPS] = if (enabled) current + crop.name else current - crop.name
     }
 
     suspend fun setLeadMinutes(minutes: Int) = dataStore.edit { it[LEAD_MINUTES] = minutes }
@@ -91,11 +95,13 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
             } else {
                 null
             },
-            trackHistory = this[TRACK_HISTORY] ?: false,
             subscribedEvents = this[EVENTS].orEmpty()
                 .mapNotNull { name -> EventType.entries.find { it.name == name } }
                 .toSet(),
             leadMinutes = this[LEAD_MINUTES] ?: 5,
+            jacobCrops = this[JACOB_CROPS].orEmpty()
+                .mapNotNull { name -> Crop.entries.find { it.name == name } }
+                .toSet(),
         )
     }
 
@@ -105,9 +111,9 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
         val PROFILE_ID = stringPreferencesKey("profile_id")
         val CUTE_NAME = stringPreferencesKey("cute_name")
         val CACHED_PROFILE = stringPreferencesKey("cached_profile")
-        val TRACK_HISTORY = booleanPreferencesKey("track_history")
         val EVENTS = stringSetPreferencesKey("subscribed_events")
         val LEAD_MINUTES = intPreferencesKey("lead_minutes")
+        val JACOB_CROPS = stringSetPreferencesKey("jacob_crops")
         val FCM_TOKEN = stringPreferencesKey("fcm_token")
         val INSTALLATION_ID = stringPreferencesKey("installation_id")
     }

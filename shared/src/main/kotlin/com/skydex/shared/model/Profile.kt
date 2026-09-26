@@ -1,5 +1,7 @@
 package com.skydex.shared.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /** `GET /v1/players/{name}`: a Minecraft player and their Skyblock profiles. */
@@ -35,6 +37,15 @@ data class SkyblockProfile(
     /** null when the player has the Banking API disabled. */
     val bankBalance: Double? = null,
     val fairySouls: Int,
+    /**
+     * Fairy souls in the game. The server fills it from its own constant, so a new total only needs a server
+     * deploy; the default covers cached profiles and servers that predate the field.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault
+    val fairySoulsTotal: Int = 289,
+    /** Mean level of the non-cosmetic skills with progress, e.g. 52.47. null from servers that predate it. */
+    val skillAverage: Double? = null,
     val skills: List<SkillLevel>,
     val slayers: List<SlayerLevel>,
     val catacombs: SkillLevel? = null,
@@ -42,6 +53,23 @@ data class SkyblockProfile(
     val lastSave: Long? = null,
     /** Unix millis when the server fetched this from Hypixel. */
     val fetchedAt: Long,
+    /** The player's Hypixel rank, e.g. MVP+. null for no rank, or when the server couldn't look it up. */
+    val rank: PlayerRank? = null,
+    /** The player's skin face with its hat layer: 64 ARGB ints, row-major 8x8. null when the skin is unavailable. */
+    val face: List<Int>? = null,
+)
+
+/** A Hypixel rank as a SkyCrypt-style badge: [name] on [color], then an optional [plus] segment on [plusColor]. */
+@Serializable
+data class PlayerRank(
+    /** e.g. "MVP", "ADMIN", "YOUTUBE". */
+    val name: String,
+    /** "#RRGGBB". */
+    val color: String,
+    /** "+" or "++", if the rank has them. */
+    val plus: String? = null,
+    /** "#RRGGBB"; set whenever [plus] is. */
+    val plusColor: String? = null,
 )
 
 @Serializable

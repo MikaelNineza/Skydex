@@ -10,15 +10,16 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class DeviceRegistration(
-    /** Empty when the device has no push token yet; it then only gets its profile tracked. */
+    /** Empty until Firebase issues a token; the server skips alerts for the device until then. */
     val fcmToken: String,
-    /** Profile the server snapshots for this device's stats history, if any. */
-    val trackedUuid: String? = null,
-    val trackedProfileId: String? = null,
-    /** Events this device wants a push for. */
+    /** Events this device wants a push for. Names the server doesn't know (from a newer app) are dropped. */
+    @Serializable(with = LenientEventTypeSet::class)
     val subscribedEvents: Set<EventType> = emptySet(),
     /** How long before an event starts to send the push. */
     val leadMinutes: Int = 5,
+    /** Crops that make a Jacob's contest worth a push. Empty = any crop. */
+    @Serializable(with = LenientCropSet::class)
+    val jacobCrops: Set<Crop> = emptySet(),
 )
 
 /** Body of every non-2xx response from the server. */

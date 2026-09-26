@@ -27,13 +27,15 @@ fun formatCoins(coins: Double): String {
 
 private fun roundTenths(value: Double) = (value * 10).roundToLong() / 10.0
 
-/** Time until an event: "1h 02m 03s", "4m 05s", "9s". Negative durations show as "0s". */
+/** Time until an event: "2d 03h 04m", "1h 02m 03s", "4m 05s", "9s". Negative durations show as "0s". */
 fun formatCountdown(millis: Long): String {
     val totalSeconds = (millis.coerceAtLeast(0) + 999) / 1000
-    val hours = totalSeconds / 3600
+    val days = totalSeconds / 86_400
+    val hours = totalSeconds % 86_400 / 3600
     val minutes = totalSeconds % 3600 / 60
     val seconds = totalSeconds % 60
     return when {
+        days > 0 -> String.format(Locale.ROOT, "%dd %02dh %02dm", days, hours, minutes)
         hours > 0 -> String.format(Locale.ROOT, "%dh %02dm %02ds", hours, minutes, seconds)
         minutes > 0 -> String.format(Locale.ROOT, "%dm %02ds", minutes, seconds)
         else -> "${seconds}s"

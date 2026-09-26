@@ -18,7 +18,15 @@ class SkyblockEventsTest {
     @Test
     fun everyTypeAppearsWithinAYear() {
         val events = SkyblockEvents.upcoming(SkyblockDate(300, 1, 1).toMillis(), YEAR_MILLIS)
-        assertEquals(EventType.values().toSet(), events.map { it.type }.toSet())
+        // Perk-gated events need an active mayor, and the Year-of events only come every 12 years.
+        val excluded = setOf(
+            EventType.FISHING_FESTIVAL,
+            EventType.MINING_FIESTA,
+            EventType.YEAR_OF_THE_SEAL,
+            EventType.YEAR_OF_THE_WITCH,
+            EventType.YEAR_OF_THE_PIG,
+        )
+        assertEquals(EventType.values().toSet() - excluded, events.map { it.type }.toSet())
     }
 
     @Test
@@ -119,6 +127,151 @@ class SkyblockEventsTest {
         assertEquals(0, bank(interest + 1, 0).size)
         assertEquals(0, bank(interest - 10, 10).size)
         assertEquals(1, bank(interest - 10, 11).size)
+    }
+
+    // Term won in the Year 515 election: Late Spring 27th, 516 until Late Spring 27th, 517.
+    private val term = termBounds(515)
+    private val fiestaPerks = ActivePerks(miningFiesta = true, termStartsAt = term.first, termEndsAt = term.second)
+    private val fishingPerks = ActivePerks(fishingFestival = true, termStartsAt = term.first, termEndsAt = term.second)
+
+    private fun starts(events: List<SkyblockEvent>) = events.map { SkyblockDate.fromMillis(it.startsAt) }
+
+    @Test
+    fun specialYearsComeEveryTwelveYears() {
+        fun whole(type: EventType, year: Int) {
+            val occurrence = SkyblockEvents.occurrences(type, SkyblockDate(year - 1, 6, 1).toMillis(), 1).single()
+            val expected = SkyblockEvent(type, SkyblockDate(year, 1, 1).toMillis(), SkyblockDate(year + 1, 1, 1).toMillis())
+            assertEquals(expected, occurrence)
+        }
+        whole(EventType.YEAR_OF_THE_SEAL, 522)
+        whole(EventType.YEAR_OF_THE_SEAL, 534)
+        whole(EventType.YEAR_OF_THE_WITCH, 524)
+        whole(EventType.YEAR_OF_THE_WITCH, 536)
+        whole(EventType.YEAR_OF_THE_PIG, 527)
+        whole(EventType.YEAR_OF_THE_PIG, 539)
+        // Running all through its year, and nothing in between: the Seal after 522 is 534.
+        val seals = SkyblockEvents.occurrences(EventType.YEAR_OF_THE_SEAL, SkyblockDate(522, 12, 31).toMillis(), 2)
+        assertEquals(listOf(SkyblockDate(522, 1, 1), SkyblockDate(534, 1, 1)), starts(seals))
+    }
+
+    @Test
+    fun electionBoothAndTermChange() {
+        val booth = SkyblockEvents.occurrences(EventType.ELECTION_OPEN, SkyblockDate(516, 1, 1).toMillis(), 1).single()
+        // Booth of the previous election is still open on Early Spring 1st, 516.
+        assertEquals(SkyblockDate(515, 6, 27).toMillis(), booth.startsAt)
+        assertEquals(SkyblockDate(516, 3, 27).toMillis(), booth.endsAt)
+        val next = SkyblockEvents.occurrences(EventType.ELECTION_OPEN, SkyblockDate(516, 4, 1).toMillis(), 1).single()
+        assertEquals(SkyblockDate(516, 6, 27).toMillis(), next.startsAt)
+        assertEquals(SkyblockDate(517, 3, 27).toMillis(), next.endsAt)
+
+        val change = SkyblockEvents.occurrences(EventType.MAYOR_TERM_CHANGE, SkyblockDate(516, 1, 1).toMillis(), 2)
+        assertEquals(listOf(SkyblockDate(516, 3, 27), SkyblockDate(517, 3, 27)), starts(change))
+        change.forEach { assertEquals(it.startsAt, it.endsAt) }
+        assertEquals(term.first, change[0].startsAt)
+        assertEquals(term.second, change[1].startsAt)
+    }
+
+    @Test
+    fun hoppityAndJerrysWorkshop() {
+        val now = SkyblockDate(300, 1, 1).toMillis()
+        val hoppity = SkyblockEvents.occurrences(EventType.HOPPITYS_HUNT, now, 1).single()
+        assertEquals(SkyblockDate(300, 1, 1).toMillis(), hoppity.startsAt)
+        assertEquals(SkyblockDate(300, 4, 1).toMillis(), hoppity.endsAt)
+
+        val workshop = SkyblockEvents.occurrences(EventType.JERRYS_WORKSHOP, now, 1).single()
+        assertEquals(SkyblockDate(300, 12, 1).toMillis(), workshop.startsAt)
+        assertEquals(SkyblockDate(301, 1, 1).toMillis(), workshop.endsAt)
+    }
+
+    @Test
+    fun perkEventsNeedTheirPerk() {
+        val now = SkyblockDate(516, 4, 1).toMillis()
+        for (type in listOf(EventType.MINING_FIESTA, EventType.FISHING_FESTIVAL)) {
+            assertEquals(emptyList(), SkyblockEvents.occurrences(type, now, 10))
+            assertEquals(emptyList(), of(type, SkyblockEvents.upcoming(now, YEAR_MILLIS)))
+        }
+        // One perk doesn't imply the other.
+        assertEquals(emptyList(), SkyblockEvents.occurrences(EventType.FISHING_FESTIVAL, now, 10, fiestaPerks))
+        assertEquals(emptyList(), SkyblockEvents.occurrences(EventType.MINING_FIESTA, now, 10, fishingPerks))
+    }
+
+    @Test
+    fun miningFiestaFiveTimesPerTermOnlyInsideIt() {
+        val from = SkyblockDate(515, 1, 1).toMillis()
+        val fiestas = SkyblockEvents.occurrences(EventType.MINING_FIESTA, from, 50, fiestaPerks)
+        val expected = listOf(
+            SkyblockDate(516, 4, 1), SkyblockDate(516, 6, 1), SkyblockDate(516, 8, 1),
+            SkyblockDate(516, 10, 1), SkyblockDate(517, 2, 1),
+        )
+        assertEquals(expected, starts(fiestas))
+        fiestas.forEach {
+            assertEquals(7 * DAY_MILLIS, it.endsAt - it.startsAt)
+            assertTrue(it.startsAt >= term.first && it.startsAt < term.second)
+        }
+        val window = of(EventType.MINING_FIESTA, SkyblockEvents.upcoming(from, 3 * YEAR_MILLIS, fiestaPerks))
+        assertEquals(fiestas, window)
+        assertEquals(emptyList(), SkyblockEvents.occurrences(EventType.MINING_FIESTA, term.second, 5, fiestaPerks))
+    }
+
+    @Test
+    fun fishingFestivalMonthlyInsideTerm() {
+        val festivals = SkyblockEvents.occurrences(EventType.FISHING_FESTIVAL, 0, 100, fishingPerks)
+        assertEquals(12, festivals.size)
+        assertEquals(SkyblockDate(516, 4, 1), starts(festivals).first())
+        assertEquals(SkyblockDate(517, 3, 1), starts(festivals).last())
+        festivals.forEach { assertEquals(3 * DAY_MILLIS, it.endsAt - it.startsAt) }
+        val during = SkyblockDate(516, 5, 2).toMillis()
+        val running = of(EventType.FISHING_FESTIVAL, SkyblockEvents.upcoming(during, 0, fishingPerks)).single()
+        assertEquals(SkyblockDate(516, 5, 1).toMillis(), running.startsAt)
+    }
+
+    @Test
+    fun foxyExtraEventOnSummer22nd() {
+        val foxy = ActivePerks(extraEvent = EventType.MINING_FIESTA, termStartsAt = term.first, termEndsAt = term.second)
+        val extra = SkyblockEvents.occurrences(EventType.MINING_FIESTA, SkyblockDate(516, 1, 1).toMillis(), 10, foxy)
+        val fiesta = SkyblockEvent(
+            EventType.MINING_FIESTA,
+            SkyblockDate(516, 6, 22).toMillis(),
+            SkyblockDate(516, 6, 29).toMillis(),
+        )
+        assertEquals(listOf(fiesta), extra)
+        val window = SkyblockEvents.upcoming(SkyblockDate(516, 6, 1).toMillis(), YEAR_MILLIS, foxy)
+        assertEquals(listOf(fiesta), of(EventType.MINING_FIESTA, window))
+
+        val spooky = ActivePerks(extraEvent = EventType.SPOOKY_FESTIVAL, termStartsAt = term.first, termEndsAt = term.second)
+        val spookies = SkyblockEvents.occurrences(EventType.SPOOKY_FESTIVAL, SkyblockDate(516, 4, 1).toMillis(), 2, spooky)
+        assertEquals(listOf(SkyblockDate(516, 6, 22), SkyblockDate(516, 8, 29)), starts(spookies))
+        assertEquals(3 * DAY_MILLIS, spookies[0].endsAt - spookies[0].startsAt)
+        // Once over, the extra one is gone.
+        val later = SkyblockEvents.occurrences(EventType.SPOOKY_FESTIVAL, SkyblockDate(516, 7, 1).toMillis(), 2, spooky)
+        assertEquals(listOf(SkyblockDate(516, 8, 29), SkyblockDate(517, 8, 29)), starts(later))
+    }
+
+    @Test
+    fun occurrencesReturnsExactlyCountSortedIncludingRunning() {
+        val during = SkyblockDate(300, 4, 2).toMillis()
+        val zoo = SkyblockEvents.occurrences(EventType.TRAVELING_ZOO, during, 3)
+        assertEquals(listOf(SkyblockDate(300, 4, 1), SkyblockDate(300, 10, 1), SkyblockDate(301, 4, 1)), starts(zoo))
+
+        for (type in EventType.entries - setOf(EventType.MINING_FIESTA, EventType.FISHING_FESTIVAL)) {
+            val list = SkyblockEvents.occurrences(type, during, 10)
+            assertEquals(10, list.size, "$type")
+            assertEquals(list.sortedBy { it.startsAt }, list, "$type")
+            assertTrue(list.all { it.type == type && (it.endsAt > during || it.startsAt == during) }, "$type")
+        }
+        assertEquals(emptyList(), SkyblockEvents.occurrences(EventType.DARK_AUCTION, during, 0))
+        assertFailsWith<IllegalArgumentException> { SkyblockEvents.occurrences(EventType.DARK_AUCTION, during, -1) }
+    }
+
+    @Test
+    fun occurrencesAgreeWithUpcoming() {
+        val now = SkyblockDate(516, 5, 3, 7, 30).toMillis() + 17
+        val upcoming = SkyblockEvents.upcoming(now, 2 * DAY_MILLIS, fiestaPerks)
+        for (type in EventType.entries) {
+            val expected = of(type, upcoming)
+            if (expected.isEmpty()) continue
+            assertEquals(expected, SkyblockEvents.occurrences(type, now, expected.size, fiestaPerks), "$type")
+        }
     }
 
     @Test

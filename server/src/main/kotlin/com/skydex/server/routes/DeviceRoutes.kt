@@ -21,13 +21,8 @@ private fun requireInstallationId(id: String?): String =
 
 private fun validate(registration: DeviceRegistration) {
     with(registration) {
-        // Blank means no push token yet: the device only wants its profile tracked.
+        // Blank until Firebase issues a token; the alert job skips such devices.
         if (fcmToken.length > 4096) throw BadRequestException("fcmToken is invalid")
-        if ((trackedUuid == null) != (trackedProfileId == null)) {
-            throw BadRequestException("trackedUuid and trackedProfileId must be set together")
-        }
-        trackedUuid?.let { requireUuid(it) }
-        trackedProfileId?.let { requireProfileId(it) }
         if (leadMinutes !in 0..MAX_LEAD_MINUTES) {
             throw BadRequestException("leadMinutes must be between 0 and $MAX_LEAD_MINUTES")
         }

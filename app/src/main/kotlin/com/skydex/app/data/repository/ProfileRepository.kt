@@ -5,7 +5,6 @@ import com.skydex.app.data.local.SettingsStore
 import com.skydex.app.data.remote.SkydexApi
 import com.skydex.shared.model.PlayerProfiles
 import com.skydex.shared.model.SkyblockProfile
-import com.skydex.shared.model.StatsHistory
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
@@ -29,7 +28,4 @@ class ProfileRepository @Inject constructor(private val api: SkydexApi, private 
     } catch (e: Exception) {
         store.cachedProfile.first()?.let { ProfileResult(it, fromCache = true) } ?: throw e
     }
-
-    suspend fun history(selection: Selection, days: Int): StatsHistory =
-        api.history(selection.uuid, selection.profileId, days)
 }

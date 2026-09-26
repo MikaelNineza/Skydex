@@ -2,6 +2,7 @@ package com.skydex.server.hypixel
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.UserAgent
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.Application
@@ -45,15 +46,26 @@ internal fun rateLimited(service: String, seconds: Long) =
     UpstreamException("$service rate limit reached", RateLimitedException(seconds))
 
 /**
+ * The HTTP client for every upstream API (15 s timeout, `User-Agent: Skydex-server`), closed when the application stops.
+ * Redirects aren't followed: none of our upstreams need them, and following one could send the `API-Key` header or a
+ * skin download to another host.
+ */
+fun Application.upstreamHttpClient(): HttpClient {
+    val http = HttpClient(CIO) {
+        followRedirects = false
+        engine { requestTimeout = 15_000 }
+        install(UserAgent) { agent = "Skydex-server" }
+    }
+    monitor.subscribe(ApplicationStopped) { http.close() }
+    return http
+}
+
+/**
  * Builds the production [ProfileSource] from `hypixel.apiKey` in application.conf. An empty key is allowed so the
  * server still starts; player requests then fail with 502.
  */
-fun Application.hypixelProfileSource(): HypixelProfileSource {
+fun Application.hypixelProfileSource(http: HttpClient): HypixelProfileSource {
     val apiKey = environment.config.propertyOrNull("hypixel.apiKey")?.getString().orEmpty()
     if (apiKey.isBlank()) log.warn("hypixel.apiKey is not set; player lookups will fail")
-    val http = HttpClient(CIO) {
-        engine { requestTimeout = 15_000 }
-    }
-    monitor.subscribe(ApplicationStopped) { http.close() }
-    return HypixelProfileSource(MojangClient(http), HypixelClient(http, apiKey))
+    return HypixelProfileSource(MojangClient(http), HypixelClient(http, apiKey), skins = SkinClient(http))
 }

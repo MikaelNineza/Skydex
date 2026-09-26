@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.skydex.app.data.local.Selection
 import com.skydex.app.data.local.SettingsStore
-import com.skydex.app.data.repository.DeviceRepository
 import com.skydex.app.data.repository.ProfileRepository
 import com.skydex.app.ui.common.UiState
 import com.skydex.app.ui.common.userMessage
@@ -36,7 +35,6 @@ sealed interface ProfileUiState {
 class ProfileViewModel @Inject constructor(
     private val repository: ProfileRepository,
     private val store: SettingsStore,
-    private val devices: DeviceRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
@@ -85,16 +83,6 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             store.select(Selection(player.uuid, player.username, profile.profileId, profile.cuteName))
             _search.value = null
-            // The server snapshots the selected profile, so tell it about the switch.
-            if (store.current().trackHistory) {
-                try {
-                    devices.sync()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    // Settings retries on the next change; the profile itself still loads.
-                }
-            }
         }
     }
 

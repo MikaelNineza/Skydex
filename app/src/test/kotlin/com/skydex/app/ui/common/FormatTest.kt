@@ -29,6 +29,16 @@ class FormatTest {
     }
 
     @Test
+    fun `countdown of a day or more shows days hours and minutes`() {
+        assertEquals("1d 00h 00m", formatCountdown(86_400_000))
+        assertEquals("2d 03h 04m", formatCountdown((2 * 86_400L + 3 * 3600 + 4 * 60 + 5) * 1000))
+        assertEquals("23h 59m 59s", formatCountdown(86_399_000))
+        // Rounding up a partial second can reach the next tier.
+        assertEquals("1d 00h 00m", formatCountdown(86_399_001))
+        assertEquals("30d 00h 00m", formatCountdown(30 * 86_400_000L))
+    }
+
+    @Test
     fun `countdown rounds partial seconds up and clamps negatives`() {
         assertEquals("10s", formatCountdown(9_001))
         assertEquals("0s", formatCountdown(-5_000))
