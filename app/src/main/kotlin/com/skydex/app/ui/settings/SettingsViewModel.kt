@@ -43,9 +43,9 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Forgets the selected profile so the Profile tab shows the search again. */
-    fun changePlayer() = update(syncNeeded = { it.trackHistory }) { store.clearSelection() }
-
-    fun setTrackHistory(enabled: Boolean) = update { store.setTrackHistory(enabled) }
+    fun changePlayer() {
+        viewModelScope.launch { store.clearSelection() }
+    }
 
     fun setEventEnabled(type: EventType, enabled: Boolean) = update { store.setEventEnabled(type, enabled) }
 
@@ -61,10 +61,9 @@ class SettingsViewModel @Inject constructor(
     /** A change is saved locally but no sync has picked it up yet. Only touched on the main thread. */
     private var syncPending = false
 
-    private fun update(syncNeeded: (Settings) -> Boolean = { true }, change: suspend () -> Unit) {
+    private fun update(change: suspend () -> Unit) {
         viewModelScope.launch {
             change()
-            if (!syncNeeded(store.current())) return@launch
             syncPending = true
             syncMutex.withLock {
                 // A sync that started after our change already sent it (sync sends the latest settings): e.g. rapid

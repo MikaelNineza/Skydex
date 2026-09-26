@@ -52,7 +52,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `enabling tracking registers the device`() = runTest {
+    fun `enabling an event registers the device`() = runTest {
         val sent = CompletableDeferred<HttpMethod>()
         server.handler = { request ->
             sent.complete(request.method)
@@ -61,7 +61,7 @@ class SettingsViewModelTest {
         store.select(sampleSelection)
         val vm = viewModel()
 
-        vm.setTrackHistory(true)
+        vm.setEventEnabled(EventType.DARK_AUCTION, true)
 
         assertEquals(HttpMethod.Put, sent.await())
     }
@@ -73,7 +73,7 @@ class SettingsViewModelTest {
         val vm = viewModel()
         backgroundScope.launch { vm.state.collect {} }
 
-        vm.setTrackHistory(true)
+        vm.setEventEnabled(EventType.DARK_AUCTION, true)
 
         assertEquals(
             "Couldn't save to the server: Database down",

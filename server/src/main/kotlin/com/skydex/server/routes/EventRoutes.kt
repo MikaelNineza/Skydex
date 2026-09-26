@@ -2,10 +2,18 @@ package com.skydex.server.routes
 
 import com.skydex.server.hypixel.LiveEventSource
 import com.skydex.shared.calendar.SkyblockEvents
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import kotlin.time.Duration.Companion.hours
+
+/** Parses an optional integer query parameter, defaulting when absent and clamping to [range]. */
+internal fun intParam(value: String?, name: String, default: Int, range: IntRange): Int {
+    if (value == null) return default
+    val parsed = value.toIntOrNull() ?: throw BadRequestException("$name must be an integer")
+    return parsed.coerceIn(range)
+}
 
 /** `GET /v1/events?hours=24`: event occurrences running now or starting within the window, soonest first. */
 fun Route.eventRoutes(now: () -> Long = System::currentTimeMillis) {

@@ -1,10 +1,8 @@
 package com.skydex.app.ui.profile
 
-import com.skydex.app.FakePushTokens
 import com.skydex.app.FakeServer
 import com.skydex.app.MainDispatcherRule
 import com.skydex.app.TestStore
-import com.skydex.app.data.repository.DeviceRepository
 import com.skydex.app.data.repository.ProfileRepository
 import com.skydex.app.respondJson
 import com.skydex.app.samplePlayer
@@ -36,7 +34,6 @@ class ProfileViewModelTest {
     private fun viewModel() = ProfileViewModel(
         ProfileRepository(server.api, store),
         store,
-        DeviceRepository(server.api, store, FakePushTokens()),
     )
 
     @Test

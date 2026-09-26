@@ -9,7 +9,7 @@ An Android app that tracks your Hypixel Skyblock profile and tells you about upc
 | Module | What it is |
 |---|---|
 | `app/` | Android app (Kotlin, Jetpack Compose) |
-| `server/` | Ktor backend that proxies the Hypixel API, stores snapshots, and sends push alerts |
+| `server/` | Ktor backend that proxies the Hypixel API and sends push alerts |
 | `shared/` | Plain Kotlin models and Skyblock calendar logic used by both |
 
 ## Running locally
@@ -30,10 +30,10 @@ Secrets come from environment variables (server) or `local.properties` (app). Ne
 |---|---|---|
 | `HYPIXEL_API_KEY` | server | Hypixel API key. Player lookups fail without it. |
 | `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD` | server | Postgres. Defaults match `docker-compose.yml`. |
-| `DATABASE_ENABLED` | server | `false` runs without Postgres: no device registration, history or push alerts. |
+| `DATABASE_ENABLED` | server | `false` runs without Postgres: no device registration or push alerts. |
 | `FIREBASE_CREDENTIALS` | server | Path to a Firebase service-account JSON. Without it, push alerts are only logged. |
 | `FIREBASE_APP_ID`, `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID` | app | Firebase client config. Without them, push notifications are turned off in the app. |
 
 ## Credits
 
-Skill, event and crop icons are item renders from SkyCrypt (sky.shiiyu.moe) of Minecraft and Hypixel SkyBlock textures; all rights remain with their respective owners. Contest crop data from elitebot.dev. Skydex is not affiliated with or endorsed by Mojang or Hypixel.
+Skill, event and crop icons are item renders from SkyCrypt (sky.shiiyu.moe) of Minecraft and Hypixel SkyBlock textures. Carrot and potato icons are vanilla Minecraft item textures. Mayor faces are cropped from their Hypixel SkyBlock skins. All rights remain with their respective owners. Contest crop data from elitebot.dev. Skydex is not affiliated with or endorsed by Mojang or Hypixel.

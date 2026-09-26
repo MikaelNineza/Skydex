@@ -96,16 +96,11 @@ fun SettingsScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     ) { Text("Change player or profile") }
                 }
-                ListDivider()
-                SwitchRow(
-                    title = "Track this profile's history",
-                    subtitle = "The server takes regular snapshots for the Stats tab.",
-                    checked = settings.trackHistory,
-                    enabled = settings.selection != null,
-                    onCheckedChange = viewModel::setTrackHistory,
-                )
-                s.syncError?.let { error ->
-                    ListDivider()
+            }
+        }
+        s.syncError?.let { error ->
+            item {
+                SkydexCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(error, Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
                         TextButton(onClick = viewModel::retrySync) { Text("Retry") }
@@ -167,8 +162,10 @@ fun SettingsScreen(
         item {
             Text(
                 "Skill, event and crop icons are item renders from SkyCrypt (sky.shiiyu.moe) of Minecraft and " +
-                    "Hypixel SkyBlock textures; all rights remain with their respective owners. Contest crop data " +
-                    "from elitebot.dev. Skydex is not affiliated with or endorsed by Mojang or Hypixel.",
+                    "Hypixel SkyBlock textures. Carrot and potato icons are vanilla Minecraft item textures. Mayor " +
+                    "faces are cropped from their Hypixel SkyBlock skins. All rights remain with their respective " +
+                    "owners. Contest crop data from elitebot.dev. Skydex is not affiliated with or endorsed by " +
+                    "Mojang or Hypixel.",
                 Modifier.padding(top = 16.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -226,28 +223,17 @@ private fun SwitchRow(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    subtitle: String? = null,
-    enabled: Boolean = true,
 ) {
     // The whole row toggles (bigger touch target, one TalkBack node); the Switch itself is display-only.
     Row(
         Modifier
             .fillMaxWidth()
-            .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
+            .toggleable(checked, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(title)
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        Text(title, Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

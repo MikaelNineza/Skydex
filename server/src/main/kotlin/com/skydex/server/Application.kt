@@ -21,5 +21,5 @@ fun Application.module() {
     val http = upstreamHttpClient()
     val profileSource = hypixelProfileSource(http)
     configurePlayerRoutes(profileSource)
-    configureData(profileSource, CachedLiveEventSource(ElectionClient(http), EliteClient(http)))
+    configureData(CachedLiveEventSource(ElectionClient(http), EliteClient(http)))
 }

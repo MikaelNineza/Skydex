@@ -4,21 +4,15 @@ import com.skydex.shared.model.Crop
 import com.skydex.shared.model.DeviceRegistration
 import com.skydex.shared.model.EventType
 import org.jetbrains.exposed.v1.core.ResultRow
-import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.upsert
 
 /** A registered app installation. */
 data class Device(val installationId: String, val registration: DeviceRegistration)
-
-/** A profile some device wants stats history for. */
-data class TrackedProfile(val uuid: String, val profileId: String)
 
 /** Reads and writes the [Devices] table. */
 class DeviceRepository(private val db: Database) {
@@ -28,8 +22,6 @@ class DeviceRepository(private val db: Database) {
             Devices.upsert {
                 it[Devices.installationId] = installationId
                 it[fcmToken] = registration.fcmToken
-                it[trackedUuid] = registration.trackedUuid
-                it[trackedProfileId] = registration.trackedProfileId
                 it[subscribedEvents] = registration.subscribedEvents.joinToString(",") { type -> type.name }
                 it[leadMinutes] = registration.leadMinutes
                 it[jacobCrops] = registration.jacobCrops.joinToString(",") { crop -> crop.name }
@@ -53,21 +45,10 @@ class DeviceRepository(private val db: Database) {
             Devices.selectAll().where { Devices.subscribedEvents neq "" }.map { it.toDevice() }
         }
 
-    /** Every distinct profile tracked by at least one device. */
-    suspend fun trackedProfiles(): List<TrackedProfile> =
-        db.query {
-            Devices.select(Devices.trackedUuid, Devices.trackedProfileId)
-                .where { Devices.trackedUuid.isNotNull() and Devices.trackedProfileId.isNotNull() }
-                .withDistinct()
-                .map { TrackedProfile(it[Devices.trackedUuid]!!, it[Devices.trackedProfileId]!!) }
-        }
-
     private fun ResultRow.toDevice() = Device(
         installationId = this[Devices.installationId],
         registration = DeviceRegistration(
             fcmToken = this[Devices.fcmToken],
-            trackedUuid = this[Devices.trackedUuid],
-            trackedProfileId = this[Devices.trackedProfileId],
             subscribedEvents = this[Devices.subscribedEvents].split(",")
                 .mapNotNull { name -> EventType.entries.find { it.name == name } }
                 .toSet(),

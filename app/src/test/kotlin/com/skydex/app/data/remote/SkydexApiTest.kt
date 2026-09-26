@@ -13,7 +13,6 @@ import com.skydex.shared.model.MayorStatus
 import com.skydex.shared.model.Minister
 import com.skydex.shared.model.Perk
 import com.skydex.shared.model.SkyblockProfile
-import com.skydex.shared.model.StatsHistory
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.HttpMethod
@@ -35,16 +34,6 @@ class SkydexApiTest {
 
         assertEquals(samplePlayer, player)
         assertEquals("http://test/v1/players/Techno%20blade", server.requests.single().url.toString())
-    }
-
-    @Test
-    fun `history sends the days parameter`() = runTest {
-        server.handler = { respondJson(StatsHistory("abc123", "p1", emptyList())) }
-
-        server.api.history("abc123", "p1", 7)
-
-        val url = server.requests.single().url.toString()
-        assertEquals("http://test/v1/players/abc123/profiles/p1/history?days=7", url)
     }
 
     @Test

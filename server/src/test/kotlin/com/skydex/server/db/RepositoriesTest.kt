@@ -3,7 +3,6 @@ package com.skydex.server.db
 import com.skydex.shared.model.Crop
 import com.skydex.shared.model.DeviceRegistration
 import com.skydex.shared.model.EventType
-import com.skydex.shared.model.StatPoint
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
 import kotlin.test.Test
@@ -15,19 +14,13 @@ import kotlin.test.assertTrue
 class RepositoriesTest {
     private val db = testDatabase()
     private val devices = DeviceRepository(db)
-    private val snapshots = SnapshotRepository(db)
     private val sentAlerts = SentAlertRepository(db)
-
-    private val uuid = "0123456789abcdef0123456789abcdef"
-    private val profileId = "fedcba9876543210fedcba9876543210"
 
     @Test
     fun deviceUpsertReplacesAndDeleteRemoves() = runBlocking {
         devices.upsert("a", DeviceRegistration(fcmToken = "t1"), now = 1)
         val updated = DeviceRegistration(
             fcmToken = "t2",
-            trackedUuid = uuid,
-            trackedProfileId = profileId,
             subscribedEvents = setOf(EventType.DARK_AUCTION, EventType.BANK_INTEREST),
             leadMinutes = 10,
         )
@@ -40,31 +33,13 @@ class RepositoriesTest {
     }
 
     @Test
-    fun subscribedAndTrackedProfiles() = runBlocking {
+    fun subscribedDevices() = runBlocking {
         devices.upsert("none", DeviceRegistration(fcmToken = "t"), now = 0)
-        val tracking = DeviceRegistration(
-            fcmToken = "t",
-            trackedUuid = uuid,
-            trackedProfileId = profileId,
-            subscribedEvents = setOf(EventType.JACOBS_CONTEST),
-        )
-        devices.upsert("b", tracking, now = 0)
-        devices.upsert("c", tracking, now = 0)
+        val subscribed = DeviceRegistration(fcmToken = "t", subscribedEvents = setOf(EventType.JACOBS_CONTEST))
+        devices.upsert("b", subscribed, now = 0)
+        devices.upsert("c", subscribed, now = 0)
 
         assertEquals(setOf("b", "c"), devices.subscribed().map { it.installationId }.toSet())
-        assertEquals(listOf(TrackedProfile(uuid, profileId)), devices.trackedProfiles())
-    }
-
-    @Test
-    fun snapshotHistoryIsOldestFirstAndPruned() = runBlocking {
-        for (t in listOf(300L, 100L, 200L)) snapshots.insert(uuid, profileId, point(t))
-        snapshots.insert(uuid, "other", point(250))
-
-        assertEquals(listOf(200L, 300L), snapshots.history(uuid, profileId, sinceMillis = 150).map { it.takenAt })
-        assertEquals(point(100), snapshots.history(uuid, profileId, sinceMillis = 0).first())
-
-        assertEquals(2, snapshots.prune(beforeMillis = 250))
-        assertEquals(listOf(300L), snapshots.history(uuid, profileId, sinceMillis = 0).map { it.takenAt })
     }
 
     @Test
@@ -99,13 +74,14 @@ class RepositoriesTest {
     }
 
     @Test
-    fun initDatabaseIsIdempotentAndAddsTheCropColumn() = runBlocking {
+    fun initDatabaseIsIdempotentAndMigratesAnOldSchema() = runBlocking {
         val dataSource = createDataSource(
             url = "jdbc:h2:mem:${UUID.randomUUID()};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
             user = "sa",
             password = "",
         )
-        // A table from before the jacob_crops column existed, with a device in it.
+        // Tables from before jacob_crops was added and while stats history existed: a device subscribed to events,
+        // one registered only to track a profile, and a snapshot.
         dataSource.connection.use { connection ->
             connection.createStatement().use {
                 it.execute(
@@ -113,7 +89,13 @@ class RepositoriesTest {
                         "tracked_uuid VARCHAR(32), tracked_profile_id VARCHAR(64), subscribed_events TEXT NOT NULL, " +
                         "lead_minutes INT NOT NULL, updated_at BIGINT NOT NULL)",
                 )
-                it.execute("INSERT INTO devices VALUES ('old', 't', NULL, NULL, 'DARK_AUCTION', 5, 0)")
+                it.execute("INSERT INTO devices VALUES ('old', 't', 'u', 'p', 'DARK_AUCTION', 5, 0)")
+                it.execute("INSERT INTO devices VALUES ('tracker', 't', 'u', 'p', '', 5, 0)")
+                it.execute(
+                    "CREATE TABLE snapshots (id BIGSERIAL PRIMARY KEY, uuid VARCHAR(32) NOT NULL, " +
+                        "profile_id VARCHAR(64) NOT NULL, taken_at BIGINT NOT NULL, skyblock_level DOUBLE PRECISION)",
+                )
+                it.execute("INSERT INTO snapshots (uuid, profile_id, taken_at, skyblock_level) VALUES ('u', 'p', 1, 2.0)")
             }
             if (!connection.autoCommit) connection.commit()
         }
@@ -121,22 +103,36 @@ class RepositoriesTest {
         val db = initDatabase(dataSource)
         val repository = DeviceRepository(db)
 
+        dataSource.connection.use { connection ->
+            fun count(sql: String) = connection.createStatement().use { statement ->
+                statement.executeQuery(sql).use { it.next(); it.getInt(1) }
+            }
+            assertEquals(
+                0,
+                count("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE LOWER(TABLE_NAME) = 'snapshots'"),
+            )
+            assertEquals(
+                0,
+                count(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_NAME) = 'devices' " +
+                        "AND LOWER(COLUMN_NAME) LIKE 'tracked%'",
+                ),
+            )
+            assertEquals(
+                1,
+                count(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_NAME) = 'devices' " +
+                        "AND LOWER(COLUMN_NAME) = 'jacob_crops'",
+                ),
+            )
+        }
         assertEquals(
             DeviceRegistration(fcmToken = "t", subscribedEvents = setOf(EventType.DARK_AUCTION)),
             repository.find("old")?.registration,
         )
+        assertNull(repository.find("tracker"))
         val withCrops = DeviceRegistration(fcmToken = "t", jacobCrops = setOf(Crop.MELON))
         repository.upsert("new", withCrops, now = 0)
         assertEquals(withCrops, repository.find("new")?.registration)
     }
-
-    private fun point(takenAt: Long) = StatPoint(
-        takenAt = takenAt,
-        skyblockLevel = 100.5,
-        purse = 1e6,
-        bankBalance = null,
-        skillAverage = 30.0,
-        catacombsLevel = 25,
-        totalSlayerXp = 123_456,
-    )
 }

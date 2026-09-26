@@ -2,7 +2,6 @@ package com.skydex.app.data.local
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -24,7 +23,6 @@ data class Selection(val uuid: String, val username: String, val profileId: Stri
 
 data class Settings(
     val selection: Selection? = null,
-    val trackHistory: Boolean = false,
     val subscribedEvents: Set<EventType> = emptySet(),
     val leadMinutes: Int = 5,
     /** Crops a Jacob's contest must include to be worth a push. Empty = any crop. */
@@ -64,8 +62,6 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
         it[CACHED_PROFILE] = SkydexJson.encodeToString(profile)
     }
 
-    suspend fun setTrackHistory(enabled: Boolean) = dataStore.edit { it[TRACK_HISTORY] = enabled }
-
     suspend fun setEventEnabled(type: EventType, enabled: Boolean) = dataStore.edit {
         val current = it[EVENTS].orEmpty()
         it[EVENTS] = if (enabled) current + type.name else current - type.name
@@ -99,7 +95,6 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
             } else {
                 null
             },
-            trackHistory = this[TRACK_HISTORY] ?: false,
             subscribedEvents = this[EVENTS].orEmpty()
                 .mapNotNull { name -> EventType.entries.find { it.name == name } }
                 .toSet(),
@@ -116,7 +111,6 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
         val PROFILE_ID = stringPreferencesKey("profile_id")
         val CUTE_NAME = stringPreferencesKey("cute_name")
         val CACHED_PROFILE = stringPreferencesKey("cached_profile")
-        val TRACK_HISTORY = booleanPreferencesKey("track_history")
         val EVENTS = stringSetPreferencesKey("subscribed_events")
         val LEAD_MINUTES = intPreferencesKey("lead_minutes")
         val JACOB_CROPS = stringSetPreferencesKey("jacob_crops")

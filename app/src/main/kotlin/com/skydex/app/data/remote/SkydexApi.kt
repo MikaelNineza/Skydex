@@ -6,7 +6,6 @@ import com.skydex.shared.model.JacobContest
 import com.skydex.shared.model.MayorStatus
 import com.skydex.shared.model.PlayerProfiles
 import com.skydex.shared.model.SkyblockProfile
-import com.skydex.shared.model.StatsHistory
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.HttpClientEngine
@@ -14,7 +13,6 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
-import io.ktor.client.request.parameter
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -45,11 +43,6 @@ class SkydexApi @Inject constructor(private val client: HttpClient) {
 
     suspend fun profile(uuid: String, profileId: String): SkyblockProfile =
         client.get("v1/players/${uuid.path()}/profiles/${profileId.path()}").bodyOrThrow()
-
-    suspend fun history(uuid: String, profileId: String, days: Int): StatsHistory =
-        client.get("v1/players/${uuid.path()}/profiles/${profileId.path()}/history") {
-            parameter("days", days)
-        }.bodyOrThrow()
 
     suspend fun mayor(): MayorStatus = client.get("v1/mayor").bodyOrThrow()
 

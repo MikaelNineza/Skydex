@@ -16,6 +16,7 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -36,9 +37,8 @@ class DeviceRepositoryTest {
         SkydexJson.decodeFromString<DeviceRegistration>(body.toByteArray().decodeToString())
 
     @Test
-    fun `tracking and events are sent with the installation id`() = runTest {
+    fun `events are sent with the installation id`() = runTest {
         store.select(sampleSelection)
-        store.setTrackHistory(true)
         store.setEventEnabled(EventType.DARK_AUCTION, true)
         store.setLeadMinutes(10)
 
@@ -48,9 +48,12 @@ class DeviceRepositoryTest {
         assertEquals(HttpMethod.Put, request.method)
         assertEquals("/v1/devices/${store.installationId()}", request.url.encodedPath)
         assertEquals(
-            DeviceRegistration("fcm-token", "abc123", "p1", setOf(EventType.DARK_AUCTION), 10),
+            DeviceRegistration("fcm-token", subscribedEvents = setOf(EventType.DARK_AUCTION), leadMinutes = 10),
             request.registration(),
         )
+        // The stats history's tracked profile is gone from the wire format.
+        val body = request.body.toByteArray().decodeToString()
+        assertFalse(body, "tracked" in body)
     }
 
     @Test
@@ -79,14 +82,13 @@ class DeviceRepositoryTest {
     }
 
     @Test
-    fun `events are not subscribed when push is not configured`() = runTest {
+    fun `without push the registration is deleted`() = runTest {
         store.select(sampleSelection)
-        store.setTrackHistory(true)
         store.setEventEnabled(EventType.DARK_AUCTION, true)
 
         repository(pushConfigured = false).sync()
 
-        assertEquals(emptySet<EventType>(), server.requests.single().registration().subscribedEvents)
+        assertEquals(HttpMethod.Delete, server.requests.single().method)
     }
 
     @Test

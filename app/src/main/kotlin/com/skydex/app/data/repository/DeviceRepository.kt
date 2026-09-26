@@ -19,26 +19,22 @@ class DeviceRepository @Inject constructor(
     private val mutex = Mutex()
 
     /**
-     * PUTs the current registration, or DELETEs it when there is nothing left for the server to do.
+     * PUTs the current registration, or DELETEs it when the device wants no alerts (or push isn't configured).
      * Calls run one at a time and each sends the latest settings, so rapid toggles can't land out of order.
      */
     suspend fun sync() = mutex.withLock {
         val settings = store.current()
         val installationId = store.installationId()
-        val tracked = settings.selection?.takeIf { settings.trackHistory }
         val events = if (pushTokens.isConfigured) settings.subscribedEvents else emptySet()
-        if (tracked == null && events.isEmpty()) {
+        if (events.isEmpty()) {
             api.unregisterDevice(installationId)
             return@withLock
         }
         api.registerDevice(
             installationId,
             DeviceRegistration(
-                // Empty until Firebase registers (the messaging service re-syncs then) or when push isn't
-                // configured, where history tracking still needs a registration.
+                // Empty until Firebase registers; the messaging service re-syncs then.
                 fcmToken = pushTokens.token().orEmpty(),
-                trackedUuid = tracked?.uuid,
-                trackedProfileId = tracked?.profileId,
                 subscribedEvents = events,
                 leadMinutes = settings.leadMinutes,
                 jacobCrops = settings.jacobCrops,
