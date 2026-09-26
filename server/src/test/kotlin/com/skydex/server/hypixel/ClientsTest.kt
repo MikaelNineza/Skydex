@@ -13,7 +13,9 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private const val UUID = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
@@ -112,6 +114,52 @@ class ClientsTest {
         now += 20_000
         assertFailsWith<UpstreamException> { client.skyblockProfiles(UUID) }
         assertEquals(2, engine.requestHistory.size)
+    }
+
+    @Test
+    fun hypixelPlayerSendsKeyAndReturnsThePlayer() = runBlocking<Unit> {
+        var body = """{"success":true,"player":{"displayname":"Tester","newPackageRank":"MVP_PLUS"}}"""
+        val (engine, http) = mockHttp { respond(body, headers = json) }
+        val client = HypixelClient(http, "secret-key")
+
+        assertEquals("\"MVP_PLUS\"", client.player(UUID)?.get("newPackageRank").toString())
+        val request = engine.requestHistory.single()
+        assertEquals("https://api.hypixel.net/v2/player?uuid=$UUID", request.url.toString())
+        assertEquals("secret-key", request.headers["API-Key"])
+
+        // Players who never joined Hypixel come back as "player": null.
+        body = """{"success":true,"player":null}"""
+        assertNull(client.player(UUID))
+        body = """{"success":true}"""
+        assertNull(client.player(UUID))
+    }
+
+    @Test
+    fun hypixelIsRateLimitedAfter429UntilReset() = runBlocking<Unit> {
+        var now = 1_000_000L
+        val (_, http) = mockHttp {
+            respond("""{"success":false,"throttle":true}""", HttpStatusCode.TooManyRequests,
+                headersOf("RateLimit-Reset", "30"))
+        }
+        val client = HypixelClient(http, "key", clock = { now })
+
+        assertFalse(client.isRateLimited)
+        assertFailsWith<UpstreamException> { client.player(UUID) }
+        assertTrue(client.isRateLimited)
+        // The block is shared with profile calls.
+        val blocked = assertFailsWith<UpstreamException> { client.skyblockProfiles(UUID) }
+        assertIs<RateLimitedException>(blocked.cause)
+        now += 30_000
+        assertFalse(client.isRateLimited)
+    }
+
+    @Test
+    fun mojangKeepsTexturesProperty() = runBlocking<Unit> {
+        val (_, http) = mockHttp {
+            respond("""{"id":"$UUID","name":"Tester","properties":[{"name":"textures","value":"abc"}]}""",
+                headers = json)
+        }
+        assertEquals(listOf(MojangProperty("textures", "abc")), MojangClient(http).byUuid(UUID).properties)
     }
 
     @Test

@@ -5,7 +5,8 @@ import com.skydex.app.R
 import com.skydex.shared.model.Crop
 
 // Crop icons are SkyCrypt's item renders (sky.shiiyu.moe/api/item/<ID>), downloaded once and bundled in
-// res/drawable-nodpi, like the skill and event icons: the app never fetches them at runtime.
+// res/drawable-nodpi, like the skill and event icons: the app never fetches them at runtime. Carrot and potato are
+// vanilla Minecraft item textures instead, since SkyCrypt's planted-crop renders of the two look alike.
 
 /** Bundled icon for a Jacob's contest crop. */
 @DrawableRes

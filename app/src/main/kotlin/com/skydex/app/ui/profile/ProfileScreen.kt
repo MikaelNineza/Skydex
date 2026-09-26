@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -110,17 +111,34 @@ private fun ProfileContent(
 @Composable
 private fun Header(profile: SkyblockProfile, offline: Boolean) {
     Column {
-        Text(profile.username, style = MaterialTheme.typography.headlineMedium)
-        Text(
-            buildAnnotatedString {
-                append("${profile.cuteName} · Level ")
-                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
-                    append(String.format(Locale.ROOT, "%.2f", profile.skyblockLevel))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    profile.rank?.let {
+                        RankBadge(it)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(
+                        profile.username,
+                        style = MaterialTheme.typography.headlineMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+                Text(
+                    buildAnnotatedString {
+                        append("${profile.cuteName} · Level ")
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                            append(String.format(Locale.ROOT, "%.2f", profile.skyblockLevel))
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            PlayerFace(profile.face)
+        }
         if (offline) {
             SkydexCard(Modifier.padding(top = 8.dp).fillMaxWidth()) {
                 Text(

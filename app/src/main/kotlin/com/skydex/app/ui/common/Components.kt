@@ -63,12 +63,13 @@ fun PixelIcon(
     modifier: Modifier = Modifier,
     size: Dp = 28.dp,
     contentDescription: String? = null,
+    // The bundled renders are 128px; nearest-neighbour downscaling would drop pixels and look jagged.
+    filterQuality: FilterQuality = FilterQuality.Medium,
 ) {
     Image(
         ImageBitmap.imageResource(id),
         contentDescription = contentDescription,
         modifier = modifier.size(size),
-        // The bundled renders are 128px; nearest-neighbour downscaling would drop pixels and look jagged.
-        filterQuality = FilterQuality.Medium,
+        filterQuality = filterQuality,
     )
 }

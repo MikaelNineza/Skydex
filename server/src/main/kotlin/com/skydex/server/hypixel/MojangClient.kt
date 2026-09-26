@@ -7,10 +7,40 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import java.net.URI
+import java.util.Base64
 
-/** A Minecraft account: undashed UUID and current username. */
+/** A Minecraft account: undashed UUID and current username. [properties] only come from the session server. */
 @Serializable
-data class MojangProfile(val id: String, val name: String)
+data class MojangProfile(val id: String, val name: String, val properties: List<MojangProperty> = emptyList())
+
+/** A session-server profile property; "textures" holds Base64 JSON with the skin URL. */
+@Serializable
+data class MojangProperty(val name: String, val value: String)
+
+/**
+ * The skin URL from the "textures" property, or null if there is none or it isn't on textures.minecraft.net (the
+ * server downloads it, so only Mojang's texture host is allowed).
+ */
+internal fun MojangProfile.skinUrl(): String? = try {
+    properties.firstOrNull { it.name == "textures" }?.let { property ->
+        val json = upstreamJson.parseToJsonElement(String(Base64.getDecoder().decode(property.value))).jsonObject
+        val skin = (json["textures"] as? JsonObject)?.get("SKIN") as? JsonObject
+        val url = (skin?.get("url") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        val uri = url?.let(::URI)
+        if (uri?.host == "textures.minecraft.net" && uri.scheme in setOf("http", "https")) {
+            // Mojang still hands out http:// texture URLs; the same path is served over https.
+            "https://" + url.substringAfter("://")
+        } else {
+            null
+        }
+    }
+} catch (e: Exception) {
+    null
+}
 
 /** Resolves Minecraft usernames and UUIDs through Mojang's public API. */
 class MojangClient(

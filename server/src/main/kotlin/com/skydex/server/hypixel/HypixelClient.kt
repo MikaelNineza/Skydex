@@ -26,17 +26,34 @@ class HypixelClient(
     @Volatile
     private var blockedUntil = 0L
 
+    /** True while a 429 from Hypixel is in effect; calls fail without reaching Hypixel until it passes. */
+    val isRateLimited: Boolean get() = blockedUntil > clock()
+
     /**
      * Raw `profiles` array from `GET /v2/skyblock/profiles` for an undashed [uuid]. Empty if the player has never
      * played Skyblock.
      */
     suspend fun skyblockProfiles(uuid: String): List<JsonObject> {
+        val body = get("/v2/skyblock/profiles", uuid)
+        return try {
+            // "profiles" is null for players who have never joined Skyblock.
+            (body["profiles"] as? JsonArray)?.map { it.jsonObject }.orEmpty()
+        } catch (e: IllegalArgumentException) {
+            throw UpstreamException("Unexpected Hypixel response", e)
+        }
+    }
+
+    /** Raw `player` object from `GET /v2/player` for an undashed [uuid], or null if they never joined Hypixel. */
+    suspend fun player(uuid: String): JsonObject? = get("/v2/player", uuid)["player"] as? JsonObject
+
+    /** Calls [path] for [uuid] and returns the JSON body; throws [UpstreamException] on any failure. */
+    private suspend fun get(path: String, uuid: String): JsonObject {
         if (apiKey.isBlank()) throw UpstreamException("Hypixel API key is not configured")
         val waitMillis = blockedUntil - clock()
         if (waitMillis > 0) throw rateLimited("Hypixel", (waitMillis + 999) / 1000)
 
         val response = upstreamCall("Hypixel") {
-            http.get("$baseUrl/v2/skyblock/profiles") {
+            http.get("$baseUrl$path") {
                 parameter("uuid", uuid)
                 header("API-Key", apiKey)
             }
@@ -52,9 +69,7 @@ class HypixelClient(
         }
 
         return try {
-            val body = upstreamJson.parseToJsonElement(response.bodyAsText()).jsonObject
-            // "profiles" is null for players who have never joined Skyblock.
-            (body["profiles"] as? JsonArray)?.map { it.jsonObject }.orEmpty()
+            upstreamJson.parseToJsonElement(response.bodyAsText()).jsonObject
         } catch (e: IllegalArgumentException) { // includes SerializationException
             throw UpstreamException("Unexpected Hypixel response", e)
         }

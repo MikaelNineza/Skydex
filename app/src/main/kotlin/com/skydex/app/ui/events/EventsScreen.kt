@@ -167,7 +167,10 @@ private fun MayorCard(
 
 @Composable
 private fun MayorContent(status: MayorStatus, perkpocalypse: Boolean, termStatus: String?) {
-    Text("Mayor ${status.mayor.name}", style = MaterialTheme.typography.titleMedium)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MayorFace(status.mayor.name, 28.dp)
+        Text("Mayor ${status.mayor.name}", style = MaterialTheme.typography.titleMedium)
+    }
     if (perkpocalypse) {
         Text(
             "Perkpocalypse — timing unpredictable",
@@ -180,7 +183,14 @@ private fun MayorContent(status: MayorStatus, perkpocalypse: Boolean, termStatus
         }
     }
     status.minister?.let { minister ->
-        Text("Minister ${minister.name}", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.titleSmall)
+        Row(
+            Modifier.padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MayorFace(minister.name, 22.dp)
+            Text("Minister ${minister.name}", style = MaterialTheme.typography.titleSmall)
+        }
         key("minister/${status.electionYear}/${minister.key}/${minister.perk.name}") { PerkRow(minister.perk) }
     }
     if (termStatus != null) {
@@ -192,12 +202,18 @@ private fun MayorContent(status: MayorStatus, perkpocalypse: Boolean, termStatus
         key(section.key) {
             Collapsible(section.title, "results", titleStyle = MaterialTheme.typography.titleSmall) {
                 section.candidates.forEach {
-                    Text(
-                        "${it.name} · ${it.percent}%",
+                    Row(
                         Modifier.padding(bottom = 4.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        MayorFace(it.name, 20.dp)
+                        Text(
+                            "${it.name} · ${it.percent}%",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
