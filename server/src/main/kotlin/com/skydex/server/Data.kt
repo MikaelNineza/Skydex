@@ -5,6 +5,7 @@ import com.skydex.server.db.SentAlertRepository
 import com.skydex.server.db.SnapshotRepository
 import com.skydex.server.db.createDataSource
 import com.skydex.server.db.initDatabase
+import com.skydex.server.hypixel.LiveEventSource
 import com.skydex.server.hypixel.ProfileSource
 import com.skydex.server.jobs.EventAlertJob
 import com.skydex.server.jobs.SnapshotJob
@@ -14,6 +15,7 @@ import com.skydex.server.notifications.LoggingPushSender
 import com.skydex.server.routes.deviceRoutes
 import com.skydex.server.routes.eventRoutes
 import com.skydex.server.routes.historyRoutes
+import com.skydex.server.routes.liveEventRoutes
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.log
@@ -23,13 +25,16 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Wires the event route, and when `database.enabled` is true also the database, device and history routes,
- * the snapshot job (fed by [profileSource]) and the event alert job.
+ * Wires the event routes (live ones fed by [live]), and when `database.enabled` is true also the database, device and
+ * history routes, the snapshot job (fed by [profileSource]) and the event alert job.
  *
  * Without `database.enabled` (as in tests, whose config is empty) the server runs without Postgres.
  */
-fun Application.configureData(profileSource: ProfileSource) {
-    routing { eventRoutes() }
+fun Application.configureData(profileSource: ProfileSource, live: LiveEventSource) {
+    routing {
+        eventRoutes()
+        liveEventRoutes(live)
+    }
 
     val config = environment.config
     fun property(path: String): String? = config.propertyOrNull(path)?.getString()
@@ -70,7 +75,7 @@ fun Application.configureData(profileSource: ProfileSource) {
         snapshotJob.runOnce(System.currentTimeMillis())
     }
 
-    val alertJob = EventAlertJob(devices, sentAlerts, pushSender)
+    val alertJob = EventAlertJob(devices, sentAlerts, pushSender, live)
     val alertInterval = (property("jobs.alertIntervalSeconds")?.toLong() ?: 60).seconds
     launchEvery(alertInterval, LoggerFactory.getLogger(EventAlertJob::class.java)) {
         alertJob.runOnce(System.currentTimeMillis())

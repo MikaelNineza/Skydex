@@ -1,6 +1,10 @@
 package com.skydex.server
 
+import com.skydex.server.hypixel.CachedLiveEventSource
+import com.skydex.server.hypixel.ElectionClient
+import com.skydex.server.hypixel.EliteClient
 import com.skydex.server.hypixel.hypixelProfileSource
+import com.skydex.server.hypixel.upstreamHttpClient
 import com.skydex.server.plugins.configureMonitoring
 import com.skydex.server.plugins.configureSerialization
 import com.skydex.server.plugins.configureStatusPages
@@ -14,7 +18,8 @@ fun Application.module() {
     configureMonitoring()
     configureStatusPages()
     configureRouting()
-    val profileSource = hypixelProfileSource()
+    val http = upstreamHttpClient()
+    val profileSource = hypixelProfileSource(http)
     configurePlayerRoutes(profileSource)
-    configureData(profileSource)
+    configureData(profileSource, CachedLiveEventSource(ElectionClient(http), EliteClient(http)))
 }

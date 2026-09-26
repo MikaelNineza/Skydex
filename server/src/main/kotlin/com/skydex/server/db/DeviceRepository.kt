@@ -1,5 +1,6 @@
 package com.skydex.server.db
 
+import com.skydex.shared.model.Crop
 import com.skydex.shared.model.DeviceRegistration
 import com.skydex.shared.model.EventType
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -31,6 +32,7 @@ class DeviceRepository(private val db: Database) {
                 it[trackedProfileId] = registration.trackedProfileId
                 it[subscribedEvents] = registration.subscribedEvents.joinToString(",") { type -> type.name }
                 it[leadMinutes] = registration.leadMinutes
+                it[jacobCrops] = registration.jacobCrops.joinToString(",") { crop -> crop.name }
                 it[updatedAt] = now
             }
         }
@@ -70,6 +72,9 @@ class DeviceRepository(private val db: Database) {
                 .mapNotNull { name -> EventType.entries.find { it.name == name } }
                 .toSet(),
             leadMinutes = this[Devices.leadMinutes],
+            jacobCrops = this[Devices.jacobCrops].split(",")
+                .mapNotNull { name -> Crop.entries.find { it.name == name } }
+                .toSet(),
         ),
     )
 }

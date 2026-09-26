@@ -21,10 +21,14 @@ fun createDataSource(url: String, user: String, password: String): HikariDataSou
         },
     )
 
-/** Connects Exposed to [dataSource] and creates any missing tables. */
+/** Connects Exposed to [dataSource], creates any missing tables and adds columns newer than the tables. */
 fun initDatabase(dataSource: DataSource): Database {
     val db = Database.connect(dataSource)
-    transaction(db) { SchemaUtils.create(Devices, Snapshots, SentAlerts) }
+    transaction(db) {
+        SchemaUtils.create(Devices, Snapshots, SentAlerts)
+        // There is no migration framework; columns added after release are added here, idempotently.
+        exec("ALTER TABLE devices ADD COLUMN IF NOT EXISTS jacob_crops TEXT NOT NULL DEFAULT ''")
+    }
     return db
 }
 

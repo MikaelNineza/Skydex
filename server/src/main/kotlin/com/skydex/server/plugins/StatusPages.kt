@@ -39,9 +39,9 @@ fun Application.configureStatusPages() {
             call.application.log.warn("Upstream failure: ${e.message}", e.cause)
             if (rateLimit != null) {
                 call.response.header(HttpHeaders.RetryAfter, rateLimit.retryAfterSeconds)
-                call.respond(HttpStatusCode.ServiceUnavailable, ApiError("Rate limited by Hypixel or Mojang"))
+                call.respond(HttpStatusCode.ServiceUnavailable, ApiError("Rate limited by an upstream service"))
             } else {
-                call.respond(HttpStatusCode.BadGateway, ApiError("Hypixel or Mojang is unavailable"))
+                call.respond(HttpStatusCode.BadGateway, ApiError("Upstream service unavailable"))
             }
         }
         exception<Throwable> { call, e ->

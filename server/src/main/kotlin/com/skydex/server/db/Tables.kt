@@ -14,6 +14,9 @@ object Devices : Table("devices") {
     val subscribedEvents = text("subscribed_events")
     val leadMinutes = integer("lead_minutes")
 
+    /** Comma-separated [com.skydex.shared.model.Crop] names; empty = any crop. */
+    val jacobCrops = text("jacob_crops").default("")
+
     /** Unix millis. */
     val updatedAt = long("updated_at")
 

@@ -1,9 +1,11 @@
 package com.skydex.server.db
 
+import com.skydex.shared.model.Crop
 import com.skydex.shared.model.DeviceRegistration
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.StatPoint
 import kotlinx.coroutines.runBlocking
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -78,6 +80,54 @@ class RepositoriesTest {
 
         devices.delete("a")
         assertEquals(emptySet(), sentAlerts.sentSince(0))
+    }
+
+    @Test
+    fun jacobCropsRoundTrip() = runBlocking {
+        val registration = DeviceRegistration(
+            fcmToken = "t",
+            subscribedEvents = setOf(EventType.JACOBS_CONTEST),
+            jacobCrops = setOf(Crop.WHEAT, Crop.COCOA_BEANS, Crop.WILD_ROSE),
+        )
+        devices.upsert("crops", registration, now = 0)
+        assertEquals(registration, devices.find("crops")?.registration)
+        assertEquals(registration, devices.subscribed().single { it.installationId == "crops" }.registration)
+
+        val cleared = registration.copy(jacobCrops = emptySet())
+        devices.upsert("crops", cleared, now = 1)
+        assertEquals(cleared, devices.find("crops")?.registration)
+    }
+
+    @Test
+    fun initDatabaseIsIdempotentAndAddsTheCropColumn() = runBlocking {
+        val dataSource = createDataSource(
+            url = "jdbc:h2:mem:${UUID.randomUUID()};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+            user = "sa",
+            password = "",
+        )
+        // A table from before the jacob_crops column existed, with a device in it.
+        dataSource.connection.use { connection ->
+            connection.createStatement().use {
+                it.execute(
+                    "CREATE TABLE devices (installation_id VARCHAR(64) PRIMARY KEY, fcm_token VARCHAR(4096) NOT NULL, " +
+                        "tracked_uuid VARCHAR(32), tracked_profile_id VARCHAR(64), subscribed_events TEXT NOT NULL, " +
+                        "lead_minutes INT NOT NULL, updated_at BIGINT NOT NULL)",
+                )
+                it.execute("INSERT INTO devices VALUES ('old', 't', NULL, NULL, 'DARK_AUCTION', 5, 0)")
+            }
+            if (!connection.autoCommit) connection.commit()
+        }
+        initDatabase(dataSource)
+        val db = initDatabase(dataSource)
+        val repository = DeviceRepository(db)
+
+        assertEquals(
+            DeviceRegistration(fcmToken = "t", subscribedEvents = setOf(EventType.DARK_AUCTION)),
+            repository.find("old")?.registration,
+        )
+        val withCrops = DeviceRegistration(fcmToken = "t", jacobCrops = setOf(Crop.MELON))
+        repository.upsert("new", withCrops, now = 0)
+        assertEquals(withCrops, repository.find("new")?.registration)
     }
 
     private fun point(takenAt: Long) = StatPoint(
