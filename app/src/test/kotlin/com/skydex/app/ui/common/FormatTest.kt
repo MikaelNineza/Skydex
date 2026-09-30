@@ -19,6 +19,10 @@ class FormatTest {
     fun `rounding up moves to the next suffix`() {
         assertEquals("1M", formatCoins(999_960.0))
         assertEquals("1K", formatCoins(999.96))
+        // Whole numbers below 1K round to 1000 from 999.5, which is 1K too.
+        assertEquals("1K", formatCoins(999.6))
+        assertEquals("1K", formatCoins(999.5))
+        assertEquals("999", formatCoins(999.4))
     }
 
     @Test

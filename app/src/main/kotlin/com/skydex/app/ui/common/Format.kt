@@ -10,12 +10,14 @@ private val COIN_SUFFIXES = listOf("", "K", "M", "B", "T")
 fun formatCoins(coins: Double): String {
     var scaled = abs(coins)
     var tier = 0
-    // Round before comparing so 999_960 becomes "1M" rather than "1000K".
-    while (tier < COIN_SUFFIXES.lastIndex && roundTenths(scaled) >= 1000) {
+    // Whole numbers without a suffix, tenths with one.
+    fun rounded() = if (tier == 0) scaled.roundToLong().toDouble() else roundTenths(scaled)
+    // Round before comparing so 999_960 becomes "1M" rather than "1000K", and 999.6 "1K" rather than "1000".
+    while (tier < COIN_SUFFIXES.lastIndex && rounded() >= 1000) {
         scaled /= 1000
         tier++
     }
-    val rounded = if (tier == 0) scaled.roundToLong().toDouble() else roundTenths(scaled)
+    val rounded = rounded()
     val number = if (rounded % 1.0 == 0.0) {
         rounded.toLong().toString()
     } else {
