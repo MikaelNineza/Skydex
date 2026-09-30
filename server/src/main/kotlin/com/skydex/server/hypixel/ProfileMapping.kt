@@ -1,5 +1,7 @@
 package com.skydex.server.hypixel
 
+import com.skydex.shared.model.ApiSettings
+import com.skydex.shared.model.Leveling
 import com.skydex.shared.model.ProfileSummary
 import com.skydex.shared.model.Skills
 import com.skydex.shared.model.SkyblockProfile
@@ -12,6 +14,8 @@ import kotlinx.serialization.json.doubleOrNull
 
 // Maps the parts of Hypixel's `/v2/skyblock/profiles` JSON we use onto the shared DTOs. Every field is optional in
 // practice (new profiles and disabled API settings drop whole sections), so missing values fall back to 0 or null.
+// A section that a disabled API setting drops is also reported in `apiDisabled`: Skills removes
+// `player_data.experience`, Banking `banking`, Collections `collection` and Inventory `inventory`.
 
 internal fun summarize(profile: JsonObject): ProfileSummary = ProfileSummary(
     profileId = profile.string("profile_id").orEmpty(),
@@ -23,7 +27,8 @@ internal fun summarize(profile: JsonObject): ProfileSummary = ProfileSummary(
 /** Null if [uuid] is not a member of [profile]. */
 internal fun toSkyblockProfile(profile: JsonObject, uuid: String, username: String, fetchedAt: Long): SkyblockProfile? {
     val member = profile.obj("members")?.obj(uuid) ?: return null
-    val skills = member.obj("player_data")?.obj("experience").orEmpty()
+    val experience = member.obj("player_data")?.obj("experience")
+    val skills = experience.orEmpty()
         .mapKeys { (key, _) -> key.removePrefix("SKILL_").lowercase() }
         .filterKeys { it in Leveling.SKILL_CAPS }
         .map { (name, xp) -> Leveling.skill(name, xp.double() ?: 0.0) }
@@ -33,6 +38,12 @@ internal fun toSkyblockProfile(profile: JsonObject, uuid: String, username: Stri
             SlayerLevel(boss, xp, Leveling.slayerLevel(boss, xp))
         }
     val catacombsXp = member.obj("dungeons")?.obj("dungeon_types")?.obj("catacombs")?.get("experience")?.double()
+    val apiDisabled = buildList {
+        if (experience == null) add(ApiSettings.SKILLS)
+        if (profile.obj("banking") == null) add(ApiSettings.BANKING)
+        if (member.obj("collection") == null) add(ApiSettings.COLLECTIONS)
+        if (member.obj("inventory") == null) add(ApiSettings.INVENTORY)
+    }
 
     return SkyblockProfile(
         profileId = profile.string("profile_id").orEmpty(),
@@ -45,11 +56,12 @@ internal fun toSkyblockProfile(profile: JsonObject, uuid: String, username: Stri
         fairySouls = member.obj("fairy_soul")?.get("total_collected")?.double()?.toInt() ?: 0,
         fairySoulsTotal = Leveling.FAIRY_SOULS_TOTAL,
         skills = skills,
-        skillAverage = Skills.average(skills),
+        skillAverage = if (experience == null) null else Skills.average(skills),
         slayers = slayers,
         catacombs = catacombsXp?.let(Leveling::catacombs),
         lastSave = null, // v2 no longer reports a member's last save.
         fetchedAt = fetchedAt,
+        apiDisabled = apiDisabled,
     )
 }
 

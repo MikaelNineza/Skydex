@@ -1,10 +1,7 @@
-package com.skydex.server.hypixel
-
-import com.skydex.shared.model.SkillLevel
-import com.skydex.shared.model.Skills
+package com.skydex.shared.model
 
 /**
- * Skyblock XP tables and level math.
+ * Skyblock XP tables and level math, shared so the server can level skills and the app can show XP numbers.
  *
  * Skill tables match Hypixel's `GET /v2/resources/skyblock/skills` (fetched 2026-09). Each table lists the XP needed
  * to go from one level to the next, so `table[0]` is the XP for level 1.
@@ -48,7 +45,7 @@ object Leveling {
         116_250_000,
     )
 
-    /** Fairy souls in the game; the server sends it as [com.skydex.shared.model.SkyblockProfile.fairySoulsTotal]. */
+    /** Fairy souls in the game; the server sends it as [SkyblockProfile.fairySoulsTotal]. */
     const val FAIRY_SOULS_TOTAL = 289
 
     /** Max level per skill (lowercase name without `SKILL_`); see [Skills.CAPS]. */
@@ -79,6 +76,39 @@ object Leveling {
     /** Slayer level for [boss]; 0 for bosses we don't have a table for. */
     fun slayerLevel(boss: String, experience: Long): Int =
         SLAYER_XP[boss]?.count { experience >= it } ?: 0
+
+    /** The per-level table for a skill's lowercase name, cut to its cap; null for names we don't know. */
+    fun table(name: String): List<Long>? = when (name) {
+        "catacombs" -> CATACOMBS_XP
+        "runecrafting" -> RUNECRAFTING_XP
+        "social" -> SOCIAL_XP
+        else -> SKILL_CAPS[name]?.let { SKILL_XP.take(it) }
+    }
+
+    /**
+     * XP numbers for a leveled skill. [inLevel] of [forNextLevel] is the progress into the current level; [total]
+     * of [forMax] is the progress to the max level. [forNextLevel] is null when maxed, and then [inLevel] is any
+     * XP beyond the max (catacombs overflow).
+     */
+    data class XpProgress(val inLevel: Double, val forNextLevel: Long?, val total: Double, val forMax: Long)
+
+    /** XP numbers for [skill], walking its table like [level]; null for skills we don't have a table for. */
+    fun progress(skill: SkillLevel): XpProgress? {
+        val table = table(skill.name)?.take(skill.maxLevel) ?: return null
+        var remaining = skill.experience
+        var level = 0
+        while (level < table.size && remaining >= table[level]) {
+            remaining -= table[level]
+            level++
+        }
+        return XpProgress(remaining, table.getOrNull(level), skill.experience, table.sum())
+    }
+
+    /** Cumulative XP for the next slayer level of [boss]; null when maxed or for bosses we don't have a table for. */
+    fun slayerNextLevelXp(boss: String, experience: Long): Long? = SLAYER_XP[boss]?.firstOrNull { it > experience }
+
+    /** Cumulative XP for [boss]'s max slayer level; null for bosses we don't have a table for. */
+    fun slayerMaxXp(boss: String): Long? = SLAYER_XP[boss]?.last()
 
     /** Walks a per-level table: level is the number of levels fully paid for, capped at the table size. */
     fun level(name: String, experience: Double, table: List<Long>): SkillLevel {

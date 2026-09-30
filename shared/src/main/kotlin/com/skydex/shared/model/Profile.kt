@@ -44,7 +44,10 @@ data class SkyblockProfile(
     @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault
     val fairySoulsTotal: Int = 289,
-    /** Mean level of the non-cosmetic skills with progress, e.g. 52.47. null from servers that predate it. */
+    /**
+     * Mean level of the non-cosmetic skills with progress, e.g. 52.47. null from old servers, or when the Skills API
+     * is off.
+     */
     val skillAverage: Double? = null,
     val skills: List<SkillLevel>,
     val slayers: List<SlayerLevel>,
@@ -57,6 +60,11 @@ data class SkyblockProfile(
     val rank: PlayerRank? = null,
     /** The player's skin face with its hat layer: 64 ARGB ints, row-major 8x8. null when the skin is unavailable. */
     val face: List<Int>? = null,
+    /**
+     * [ApiSettings] names the player has turned off in SkyBlock's API settings. null from servers (and caches) that
+     * predate it.
+     */
+    val apiDisabled: List<String>? = null,
 )
 
 /** A Hypixel rank as a SkyCrypt-style badge: [name] on [color], then an optional [plus] segment on [plusColor]. */

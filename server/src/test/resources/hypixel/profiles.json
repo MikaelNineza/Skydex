@@ -55,7 +55,8 @@
             },
             "selected_dungeon_class": "mage"
           },
-          "inventory": { "inv_contents": { "type": 0, "data": "H4sIAAAAAAAAAA==" } }
+          "inventory": { "inv_contents": { "type": 0, "data": "H4sIAAAAAAAAAA==" } },
+          "collection": { "WHEAT": 1000, "LOG": 250 }
         },
         "1234567890abcdef1234567890abcdef": {
           "player_data": { "experience": { "SKILL_MINING": 1000.0 } },

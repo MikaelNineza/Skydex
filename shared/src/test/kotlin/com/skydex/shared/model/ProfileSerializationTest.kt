@@ -21,6 +21,7 @@ class ProfileSerializationTest {
         assertNull(profile.skillAverage)
         assertNull(profile.rank)
         assertNull(profile.face)
+        assertNull(profile.apiDisabled)
     }
 
     @Test
@@ -75,5 +76,22 @@ class ProfileSerializationTest {
             server.decodeFromString<DeviceRegistration>(body),
         )
         assertTrue("tracked" !in Json.encodeToString(DeviceRegistration("t")))
+    }
+
+    @Test
+    fun apiDisabledEncodesEvenWhenEmptyAndRoundTrips() {
+        val old = Json.decodeFromString<SkyblockProfile>(oldJson)
+        assertTrue("apiDisabled" !in Json.encodeToString(old))
+
+        // An empty list says "nothing is off", unlike null ("the server didn't say"), so it must be sent.
+        val none = old.copy(apiDisabled = emptyList())
+        val noneJson = Json.encodeToString(none)
+        assertTrue("\"apiDisabled\":[]" in noneJson, noneJson)
+        assertEquals(emptyList(), Json.decodeFromString<SkyblockProfile>(noneJson).apiDisabled)
+
+        val off = old.copy(apiDisabled = listOf(ApiSettings.SKILLS, ApiSettings.BANKING))
+        val decoded = Json.decodeFromString<SkyblockProfile>(Json.encodeToString(off))
+        assertEquals(off, decoded)
+        assertEquals(listOf("skills", "banking"), decoded.apiDisabled)
     }
 }

@@ -1,5 +1,7 @@
 package com.skydex.server.hypixel
 
+import com.skydex.shared.model.ApiSettings
+import com.skydex.shared.model.Leveling
 import com.skydex.shared.model.PlayerRank
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.request.HttpResponseData
@@ -89,6 +91,8 @@ class HypixelProfileSourceTest {
             profile.slayers,
         )
         assertEquals(10, profile.catacombs?.level)
+        // Skills, banking, collections and inventory are all in the response, so no API setting is off.
+        assertEquals(emptyList(), profile.apiDisabled)
     }
 
     @Test
@@ -104,7 +108,14 @@ class HypixelProfileSourceTest {
         assertEquals(0, profile.fairySouls)
         assertEquals(Leveling.FAIRY_SOULS_TOTAL, profile.fairySoulsTotal)
         assertEquals(emptyList(), profile.skills)
-        assertEquals(0.0, profile.skillAverage!!, 1e-9)
+        // No player_data.experience: the Skills API is off, so there is no average to show.
+        assertNull(profile.skillAverage)
+        // Kiwi has none of the sections that API settings gate.
+        assertEquals(
+            listOf(ApiSettings.SKILLS, ApiSettings.BANKING, ApiSettings.COLLECTIONS, ApiSettings.INVENTORY),
+            profile.apiDisabled,
+        )
+        assertEquals(listOf("skills", "banking", "collections", "inventory"), profile.apiDisabled)
     }
 
     @Test
