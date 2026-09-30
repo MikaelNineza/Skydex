@@ -11,7 +11,7 @@ enum class EventCategory {
     /** At least once per Skyblock year. */
     SEASONAL,
 
-    /** Once every few Skyblock years. */
+    /** Once every few Skyblock years or less often. */
     RARE,
 }
 
@@ -20,7 +20,7 @@ enum class EventCategory {
  * perks. Names are stored in `sent_alerts.event_type`, so they must stay within 32 characters.
  */
 @Serializable
-enum class EventType(val displayName: String, val category: EventCategory) {
+enum class EventType(val displayName: String, val category: EventCategory, val estimated: Boolean = false) {
     DARK_AUCTION("Dark Auction", EventCategory.COMMON),
     JACOBS_CONTEST("Jacob's Farming Contest", EventCategory.COMMON),
     CULT_OF_THE_FALLEN_STAR("Cult of the Fallen Star", EventCategory.COMMON),
@@ -44,6 +44,15 @@ enum class EventType(val displayName: String, val category: EventCategory) {
     YEAR_OF_THE_SEAL("Year of the Seal", EventCategory.RARE),
     YEAR_OF_THE_WITCH("Year of the Witch", EventCategory.RARE),
     YEAR_OF_THE_PIG("Year of the Pig", EventCategory.RARE),
+
+    /** A whole Skyblock year every 100 years (100, 200, …). */
+    CENTURY_CELEBRATION("Century Celebration", EventCategory.RARE),
+
+    /**
+     * Real-world birthday party ("Party Time!"), estimated: June 11 (UTC) for a week; Hypixel sets the exact days
+     * each year.
+     */
+    SKYBLOCK_ANNIVERSARY("SkyBlock Anniversary", EventCategory.RARE, estimated = true),
 }
 
 /** One occurrence of an event. `GET /v1/events` returns a list of these, soonest first. */

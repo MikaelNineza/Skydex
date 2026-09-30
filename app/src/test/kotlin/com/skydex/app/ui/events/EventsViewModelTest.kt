@@ -164,7 +164,10 @@ class EventsViewModelTest {
             content.seasonal.map { it.type }.toSet(),
         )
         assertEquals(
-            setOf(EventType.YEAR_OF_THE_SEAL, EventType.YEAR_OF_THE_WITCH, EventType.YEAR_OF_THE_PIG),
+            setOf(
+                EventType.YEAR_OF_THE_SEAL, EventType.YEAR_OF_THE_WITCH, EventType.YEAR_OF_THE_PIG,
+                EventType.CENTURY_CELEBRATION, EventType.SKYBLOCK_ANNIVERSARY,
+            ),
             content.rare.map { it.type }.toSet(),
         )
         assertEquals(content.common.sortedBy { it.next.startsAt }, content.common)
@@ -194,7 +197,7 @@ class EventsViewModelTest {
             content.common.map { it.type }.toSet(),
         )
         assertEquals(8, content.seasonal.size)
-        assertEquals(3, content.rare.size)
+        assertEquals(5, content.rare.size)
         assertFalse(content.cards().any { it.type == EventType.FISHING_FESTIVAL })
         val termStatus = assertNotNullAndGet(content.termStatus)
         assertTrue(termStatus, termStatus.matches(Regex("""Term ends in \d+d \d\dh \d\dm""")))
@@ -361,6 +364,92 @@ class EventsViewModelTest {
         advanceTimeBy(EventsViewModel.LIVE_RETRY_MILLIS + 1)
         runCurrent()
         assertEquals(UiState.Content(mayor), vm.content().mayor)
+    }
+
+    @Test
+    fun `lookups stop twelve months ahead except for the Century Celebration`() = runTest {
+        val vm = EventsViewModel(clock(now), null, SkyblockEvents::occurrences)
+        backgroundScope.launch { vm.state.collect {} }
+        runCurrent()
+        val horizon = now + EventsViewModel.LOOKUP_HORIZON_MILLIS
+        assertEquals(365L * 24 * 60 * 60 * 1000, EventsViewModel.LOOKUP_HORIZON_MILLIS)
+
+        fun rows(type: EventType): List<EventCard> {
+            vm.select(type)
+            runCurrent()
+            return assertNotNullAndGet(vm.content().detail).rows
+        }
+
+        // Ten Years of the Seal would run ~20 months; only those starting within 12 months are listed.
+        val seals = rows(EventType.YEAR_OF_THE_SEAL)
+        assertTrue(seals.isNotEmpty())
+        assertTrue("${seals.size} seals", seals.size < EventsViewModel.DETAIL_COUNT)
+        seals.forEach { assertTrue(it.next.startsAt < horizon) }
+        val allSeals = SkyblockEvents.occurrences(EventType.YEAR_OF_THE_SEAL, now + 1, EventsViewModel.DETAIL_COUNT)
+        assertEquals(allSeals.filter { it.startsAt < horizon }, seals.map { it.next })
+
+        // Once a real year: exactly one Anniversary within 12 months.
+        val anniversaries = rows(EventType.SKYBLOCK_ANNIVERSARY)
+        assertEquals(1, anniversaries.size)
+        assertEquals(Instant.parse("2027-06-11T00:00:00Z").toEpochMilli(), anniversaries.single().next.startsAt)
+
+        // The Century Celebration is exempt, listing Years 600, 700 and 800 although they are years away.
+        val centuries = rows(EventType.CENTURY_CELEBRATION)
+        assertEquals(EventsViewModel.UNCAPPED_DETAIL_COUNT, centuries.size)
+        assertEquals(3, centuries.size)
+        assertEquals(
+            listOf(SkyblockDate(600, 1, 1), SkyblockDate(700, 1, 1), SkyblockDate(800, 1, 1)).map { it.toMillis() },
+            centuries.map { it.next.startsAt },
+        )
+        assertTrue(centuries.first().next.startsAt > horizon)
+        val card = vm.content().rare.single { it.type == EventType.CENTURY_CELEBRATION }
+        assertEquals(SkyblockDate(600, 1, 1).toMillis(), card.next.startsAt)
+    }
+
+    @Test
+    fun `events past the horizon get no card and an empty detail list`() = runTest {
+        val day = 24 * 60 * 60 * 1000L
+        val year = 365 * day
+        /** The clock's time at the next tick. */
+        fun nextTick() = now + testScheduler.currentTime + 1_000
+        var bankAt = now + year + day
+        val zooAt = now + year - 1
+        val centuryAt = now + 2 * year
+        val vm = EventsViewModel(clock(now), null) { type, _, count, _ ->
+            when (type) {
+                EventType.BANK_INTEREST -> listOf(SkyblockEvent(type, bankAt, bankAt))
+                EventType.TRAVELING_ZOO -> listOf(SkyblockEvent(type, zooAt, zooAt + 1_000))
+                EventType.CENTURY_CELEBRATION -> listOf(SkyblockEvent(type, centuryAt, centuryAt + 1_000))
+                else -> emptyList()
+            }.take(count)
+        }
+        backgroundScope.launch { vm.state.collect {} }
+        runCurrent()
+
+        // +366 days: nothing, not even in the detail list.
+        assertFalse(vm.content().cards().any { it.type == EventType.BANK_INTEREST })
+        vm.select(EventType.BANK_INTEREST)
+        runCurrent()
+        assertEquals(EventDetail(EventType.BANK_INTEREST, emptyList()), vm.content().detail)
+        // Just inside the horizon: shown. Two years out, but uncapped: shown.
+        assertEquals(zooAt, vm.content().seasonal.single { it.type == EventType.TRAVELING_ZOO }.next.startsAt)
+        assertEquals(centuryAt, vm.content().rare.single { it.type == EventType.CENTURY_CELEBRATION }.next.startsAt)
+        vm.select(null)
+
+        // The horizon is exclusive.
+        bankAt = nextTick() + year
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertFalse(vm.content().cards().any { it.type == EventType.BANK_INTEREST })
+        bankAt = nextTick() + year - 1
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(bankAt, vm.content().common.single { it.type == EventType.BANK_INTEREST }.next.startsAt)
+        // +364 days.
+        bankAt = nextTick() + 364 * day
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(bankAt, vm.content().common.single { it.type == EventType.BANK_INTEREST }.next.startsAt)
     }
 
     private fun <T : Any> assertNotNullAndGet(value: T?): T {

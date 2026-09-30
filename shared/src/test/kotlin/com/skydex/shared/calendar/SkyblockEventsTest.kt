@@ -4,6 +4,7 @@ import com.skydex.shared.calendar.SkyblockCalendar.DAY_MILLIS
 import com.skydex.shared.calendar.SkyblockCalendar.YEAR_MILLIS
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.SkyblockEvent
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,14 +18,17 @@ class SkyblockEventsTest {
 
     @Test
     fun everyTypeAppearsWithinAYear() {
-        val events = SkyblockEvents.upcoming(SkyblockDate(300, 1, 1).toMillis(), YEAR_MILLIS)
-        // Perk-gated events need an active mayor, and the Year-of events only come every 12 years.
+        val events = SkyblockEvents.upcoming(SkyblockDate(301, 1, 1).toMillis(), YEAR_MILLIS)
+        // Perk-gated events need an active mayor and the Year-of events only come every 12 years. Year 301 has no
+        // Century Celebration (every 100 years) and no Anniversary (once a real year, about 71 Skyblock years).
         val excluded = setOf(
             EventType.FISHING_FESTIVAL,
             EventType.MINING_FIESTA,
             EventType.YEAR_OF_THE_SEAL,
             EventType.YEAR_OF_THE_WITCH,
             EventType.YEAR_OF_THE_PIG,
+            EventType.CENTURY_CELEBRATION,
+            EventType.SKYBLOCK_ANNIVERSARY,
         )
         assertEquals(EventType.values().toSet() - excluded, events.map { it.type }.toSet())
     }
@@ -272,6 +276,60 @@ class SkyblockEventsTest {
             if (expected.isEmpty()) continue
             assertEquals(expected, SkyblockEvents.occurrences(type, now, expected.size, fiestaPerks), "$type")
         }
+    }
+
+    @Test
+    fun centuryCelebrationEveryHundredYears() {
+        val from = SkyblockDate(517, 1, 1).toMillis()
+        val centuries = SkyblockEvents.occurrences(EventType.CENTURY_CELEBRATION, from, 2)
+        assertEquals(listOf(SkyblockDate(600, 1, 1), SkyblockDate(700, 1, 1)), starts(centuries))
+        centuries.forEach { assertEquals(YEAR_MILLIS, it.endsAt - it.startsAt) }
+        // The whole of Year 600 in real time.
+        assertEquals(Instant.parse("2027-12-01T13:55:00Z").toEpochMilli(), centuries[0].startsAt)
+        assertEquals(Instant.parse("2027-12-06T17:55:00Z").toEpochMilli(), centuries[0].endsAt)
+        assertEquals(SkyblockDate(601, 1, 1).toMillis(), centuries[0].endsAt)
+
+        // Year 500 is running mid-year, so it comes first.
+        val during = SkyblockEvents.occurrences(EventType.CENTURY_CELEBRATION, SkyblockDate(500, 6, 1).toMillis(), 2)
+        assertEquals(listOf(SkyblockDate(500, 1, 1), SkyblockDate(600, 1, 1)), starts(during))
+        assertEquals(Instant.parse("2026-07-02T21:55:00Z").toEpochMilli(), during[0].startsAt)
+        // Once Year 500 has ended, the next is 600.
+        val after = SkyblockEvents.occurrences(EventType.CENTURY_CELEBRATION, SkyblockDate(501, 1, 1).toMillis(), 1)
+        assertEquals(listOf(SkyblockDate(600, 1, 1)), starts(after))
+    }
+
+    @Test
+    fun anniversaryIsEstimatedJuneEleventhUtcForAWeek() {
+        fun at(iso: String) = Instant.parse(iso).toEpochMilli()
+        val week = 7 * 24 * HOUR
+        val next = SkyblockEvents.occurrences(EventType.SKYBLOCK_ANNIVERSARY, at("2026-09-30T00:00:00Z"), 2)
+        assertEquals(
+            listOf(
+                SkyblockEvent(EventType.SKYBLOCK_ANNIVERSARY, at("2027-06-11T00:00:00Z"), at("2027-06-11T00:00:00Z") + week),
+                SkyblockEvent(EventType.SKYBLOCK_ANNIVERSARY, at("2028-06-11T00:00:00Z"), at("2028-06-11T00:00:00Z") + week),
+            ),
+            next,
+        )
+        assertEquals(at("2027-06-18T00:00:00Z"), next[0].endsAt)
+        assertTrue(EventType.SKYBLOCK_ANNIVERSARY.estimated)
+
+        // Running during the week...
+        val during = SkyblockEvents.occurrences(EventType.SKYBLOCK_ANNIVERSARY, at("2027-06-14T12:00:00Z"), 1).single()
+        assertEquals(at("2027-06-11T00:00:00Z"), during.startsAt)
+        // ...until its exclusive end, and before June 11th the same year's is next.
+        val ended = SkyblockEvents.occurrences(EventType.SKYBLOCK_ANNIVERSARY, at("2027-06-18T00:00:00Z"), 1).single()
+        assertEquals(at("2028-06-11T00:00:00Z"), ended.startsAt)
+        val lastMoment = SkyblockEvents.occurrences(EventType.SKYBLOCK_ANNIVERSARY, at("2027-06-18T00:00:00Z") - 1, 1)
+        assertEquals(at("2027-06-11T00:00:00Z"), lastMoment.single().startsAt)
+        val early = SkyblockEvents.occurrences(EventType.SKYBLOCK_ANNIVERSARY, at("2027-01-01T00:00:00Z"), 1).single()
+        assertEquals(at("2027-06-11T00:00:00Z"), early.startsAt)
+
+        // upcoming() includes it and agrees with occurrences().
+        val from = at("2027-06-10T00:00:00Z")
+        val upcoming = of(EventType.SKYBLOCK_ANNIVERSARY, SkyblockEvents.upcoming(from, 48 * HOUR))
+        assertEquals(SkyblockEvents.occurrences(EventType.SKYBLOCK_ANNIVERSARY, from, 1), upcoming)
+        assertEquals(emptyList(), of(EventType.SKYBLOCK_ANNIVERSARY, SkyblockEvents.upcoming(from, 24 * HOUR)))
+        assertEquals(1, of(EventType.SKYBLOCK_ANNIVERSARY, SkyblockEvents.upcoming(from, 24 * HOUR + 1)).size)
     }
 
     @Test

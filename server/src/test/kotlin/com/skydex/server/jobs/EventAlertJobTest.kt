@@ -79,6 +79,23 @@ class EventAlertJobTest {
     }
 
     @Test
+    fun estimatedEventsSayItInTheAlert() {
+        val anniversary = SkyblockEvent(EventType.SKYBLOCK_ANNIVERSARY, startsAt = start, endsAt = start + 7 * 24 * 60 * MINUTE)
+        assertEquals("Starts in 5 minutes (estimated)", alertBody(anniversary, start - 5 * MINUTE))
+        assertEquals("Starts in 1 minute (estimated)", alertBody(anniversary, start - 30_000))
+        assertEquals("Starting now (estimated)", alertBody(anniversary, start))
+        // Crops (never sent for it, but the order is fixed) come after the mark.
+        assertEquals(
+            "Starts in 5 minutes (estimated) · Wheat",
+            alertBody(anniversary, start - 5 * MINUTE, listOf(Crop.WHEAT)),
+        )
+        // Events with exact dates are unchanged, the Century Celebration included.
+        val century = SkyblockEvent(EventType.CENTURY_CELEBRATION, startsAt = start, endsAt = start + MINUTE)
+        assertEquals("Starts in 5 minutes", alertBody(century, start - 5 * MINUTE))
+        assertEquals("Starts in 5 minutes", alertBody(auction, start - 5 * MINUTE))
+    }
+
+    @Test
     fun runOnceSendsEachAlertOnceAndForgetsUnregisteredTokens() = runBlocking {
         val db = testDatabase()
         val devices = DeviceRepository(db)

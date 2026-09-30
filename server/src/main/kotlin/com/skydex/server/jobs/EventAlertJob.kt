@@ -53,14 +53,17 @@ fun dueAlerts(
         .map { DueAlert(device, it) }
 }
 
-/** Notification text for [event] as seen at [now], e.g. "Starts in 5 minutes", followed by [crops] if known. */
+/**
+ * Notification text for [event] as seen at [now], e.g. "Starts in 5 minutes", marked "(estimated)" for events with
+ * estimated dates, followed by [crops] if known.
+ */
 fun alertBody(event: SkyblockEvent, now: Long, crops: List<Crop>? = null): String {
     val minutes = Math.ceilDiv(event.startsAt - now, 60_000L)
     val countdown = when {
         minutes <= 0 -> "Starting now"
         minutes == 1L -> "Starts in 1 minute"
         else -> "Starts in $minutes minutes"
-    }
+    } + if (event.type.estimated) " (estimated)" else ""
     return if (crops.isNullOrEmpty()) countdown else "$countdown · ${crops.joinToString { it.displayName }}"
 }
 

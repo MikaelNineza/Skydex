@@ -6,6 +6,8 @@ import com.skydex.shared.calendar.ActivePerks
 import com.skydex.shared.calendar.SkyblockDate
 import com.skydex.shared.calendar.SkyblockEvents
 import com.skydex.shared.calendar.termBounds
+import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -34,6 +36,8 @@ class EventCategoryTest {
             EventType.YEAR_OF_THE_SEAL to EventCategory.RARE,
             EventType.YEAR_OF_THE_WITCH to EventCategory.RARE,
             EventType.YEAR_OF_THE_PIG to EventCategory.RARE,
+            EventType.CENTURY_CELEBRATION to EventCategory.RARE,
+            EventType.SKYBLOCK_ANNIVERSARY to EventCategory.RARE,
         )
         assertEquals(expected, EventType.entries.associateWith { it.category })
     }
@@ -87,7 +91,8 @@ class EventCategoryTest {
     @Test
     fun rareEventsStartOnceInTwelveYears() {
         val from = SkyblockDate(300, 1, 1).toMillis()
-        for (type in typesIn(EventCategory.RARE)) {
+        val everyHundredOrRealYear = setOf(EventType.CENTURY_CELEBRATION, EventType.SKYBLOCK_ANNIVERSARY)
+        for (type in typesIn(EventCategory.RARE) - everyHundredOrRealYear) {
             assertEquals(1, startsIn(type, from, from + 12 * YEAR_MILLIS).size, "$type")
             // So some Skyblock years have none of it.
             val yearsWith = (300 until 312).count { y ->
@@ -96,5 +101,38 @@ class EventCategoryTest {
             }
             assertEquals(1, yearsWith, "$type")
         }
+    }
+
+    @Test
+    fun centuryCelebrationStartsOnceInAHundredYears() {
+        val from = SkyblockDate(301, 1, 1).toMillis()
+        val starts = startsIn(EventType.CENTURY_CELEBRATION, from, from + 100 * YEAR_MILLIS)
+        assertEquals(listOf(SkyblockDate(400, 1, 1).toMillis()), starts)
+        val yearsWith = (301..400).count { y ->
+            val s = SkyblockDate(y, 1, 1).toMillis()
+            startsIn(EventType.CENTURY_CELEBRATION, s, s + YEAR_MILLIS).isNotEmpty()
+        }
+        assertEquals(1, yearsWith)
+    }
+
+    @Test
+    fun anniversaryStartsOnceEveryRealYear() {
+        for (year in 2026..2030) {
+            val from = LocalDate.of(year, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            val until = LocalDate.of(year + 1, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            val june11 = LocalDate.of(year, 6, 11).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            assertEquals(listOf(june11), startsIn(EventType.SKYBLOCK_ANNIVERSARY, from, until), "$year")
+        }
+    }
+
+    @Test
+    fun onlyTheAnniversaryIsEstimated() {
+        assertEquals(listOf(EventType.SKYBLOCK_ANNIVERSARY), EventType.entries.filter { it.estimated })
+    }
+
+    @Test
+    fun namesFitSentAlertsColumn() {
+        // sent_alerts.event_type is varchar(32).
+        EventType.entries.forEach { assertTrue(it.name.length <= 32, it.name) }
     }
 }

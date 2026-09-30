@@ -60,6 +60,7 @@ import com.skydex.shared.model.Crop
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.MayorStatus
 import com.skydex.shared.model.Perk
+import java.time.Instant
 
 @Composable
 fun EventsScreen(modifier: Modifier = Modifier, viewModel: EventsViewModel = hiltViewModel()) {
@@ -72,8 +73,9 @@ fun EventsScreen(modifier: Modifier = Modifier, viewModel: EventsViewModel = hil
             modifier = modifier,
         )
         is EventsUiState.Content -> {
-            EventList(s, viewModel::select, viewModel::retryLive, modifier)
-            s.detail?.let { EventDetailSheet(it, onDismiss = { viewModel.select(null) }) }
+            val timeFormat = rememberEventTimeFormat()
+            EventList(s, timeFormat, viewModel::select, viewModel::retryLive, modifier)
+            s.detail?.let { EventDetailSheet(it, timeFormat, onDismiss = { viewModel.select(null) }) }
         }
     }
 }
@@ -81,6 +83,7 @@ fun EventsScreen(modifier: Modifier = Modifier, viewModel: EventsViewModel = hil
 @Composable
 private fun EventList(
     state: EventsUiState.Content,
+    timeFormat: EventTimeFormat,
     onSelect: (EventType) -> Unit,
     onRetryMayor: () -> Unit,
     modifier: Modifier = Modifier,
@@ -99,7 +102,7 @@ private fun EventList(
                 SkydexCard(Modifier.fillMaxWidth()) {
                     cards.forEachIndexed { index, card ->
                         if (index > 0) ListDivider()
-                        EventRow(card, onClick = { onSelect(card.type) })
+                        EventRow(card, timeFormat, onClick = { onSelect(card.type) })
                     }
                 }
             }
@@ -111,7 +114,7 @@ private fun EventList(
 }
 
 @Composable
-private fun EventRow(card: EventCard, onClick: () -> Unit) {
+private fun EventRow(card: EventCard, timeFormat: EventTimeFormat, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -121,10 +124,17 @@ private fun EventRow(card: EventCard, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(card.type.displayName, style = MaterialTheme.typography.titleMedium)
             Text(
-                card.status,
+                "${card.status} · ${card.localTime(timeFormat, Instant.now())}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (card.happeningNow) MaterialTheme.colorScheme.primary else Color.Unspecified,
             )
+            if (card.type.estimated) {
+                Text(
+                    "Estimated dates",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             card.crops?.let { ContestCrops(it) }
         }
         if (card.happeningNow) {
@@ -301,7 +311,7 @@ private fun CropsCredit(modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EventDetailSheet(detail: EventDetail, onDismiss: () -> Unit) {
+private fun EventDetailSheet(detail: EventDetail, timeFormat: EventTimeFormat, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
             item {
@@ -314,8 +324,18 @@ private fun EventDetailSheet(detail: EventDetail, onDismiss: () -> Unit) {
                     Text(detail.type.displayName, style = MaterialTheme.typography.titleLarge)
                 }
             }
+            if (detail.type.estimated) {
+                item {
+                    Text(
+                        "Estimated dates: Hypixel announces the exact days each year.",
+                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (detail.rows.isEmpty()) {
-                item { Text("No upcoming occurrences known.", Modifier.padding(horizontal = 16.dp)) }
+                item { Text("No occurrences in the next 12 months.", Modifier.padding(horizontal = 16.dp)) }
             }
             itemsIndexed(detail.rows, key = { _, row -> row.next.startsAt }) { index, row ->
                 if (index > 0) ListDivider()
@@ -326,7 +346,7 @@ private fun EventDetailSheet(detail: EventDetail, onDismiss: () -> Unit) {
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
                     Text(
-                        row.status,
+                        "${row.status} · ${row.localTime(timeFormat, Instant.now())}",
                         style = MaterialTheme.typography.titleSmall,
                         color = if (row.happeningNow) MaterialTheme.colorScheme.primary else Color.Unspecified,
                     )

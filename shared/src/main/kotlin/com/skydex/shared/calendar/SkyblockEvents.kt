@@ -7,10 +7,14 @@ import com.skydex.shared.calendar.SkyblockCalendar.MONTH_MILLIS
 import com.skydex.shared.calendar.SkyblockCalendar.YEAR_MILLIS
 import com.skydex.shared.model.EventType
 import com.skydex.shared.model.SkyblockEvent
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
  * Computes event occurrences from [SkyblockCalendar]; no network needed. Events that depend on the mayor's perks only
- * appear when the caller passes the current term's [ActivePerks].
+ * appear when the caller passes the current term's [ActivePerks]. Also covers the SkyBlock Anniversary, which follows
+ * the real calendar.
  */
 object SkyblockEvents {
     /** Year of the Seal, Witch and Pig each come around every 12 Skyblock years; these are known years of each. */
@@ -18,6 +22,16 @@ object SkyblockEvents {
     private const val YEAR_OF_THE_WITCH_ANCHOR = 524
     private const val YEAR_OF_THE_PIG_ANCHOR = 527
     private const val SPECIAL_YEAR_CYCLE = 12
+
+    /** The Century Celebration fills every 100th Skyblock year: 100, 200, … */
+    private const val CENTURY_ANCHOR = 100
+    private const val CENTURY_CYCLE = 100
+
+    /** Estimated: Hypixel picks the exact days each year, usually a week from around June 11. */
+    private const val ANNIVERSARY_MONTH = 6
+    private const val ANNIVERSARY_DAY = 11
+    private const val ANNIVERSARY_DAYS = 7L
+    private const val REAL_DAY_MILLIS = 24 * 60 * 60 * 1000L
 
     /**
      * An event that repeats every [period] millis, starting [offset] millis after the epoch
@@ -44,9 +58,9 @@ object SkyblockEvents {
         gate: ((ActivePerks) -> Boolean)? = null,
     ) = Series(type, dayOfYear(month, firstDay), YEAR_MILLIS, days * DAY_MILLIS, gate)
 
-    /** A whole Skyblock year, every 12 years, one of which is [anchorYear]. */
-    private fun everyTwelveYears(type: EventType, anchorYear: Int) =
-        Series(type, (anchorYear - 1L) * YEAR_MILLIS, SPECIAL_YEAR_CYCLE * YEAR_MILLIS, YEAR_MILLIS)
+    /** A whole Skyblock year, every [cycle] years, one of which is [anchorYear]. */
+    private fun specialYear(type: EventType, anchorYear: Int, cycle: Int = SPECIAL_YEAR_CYCLE) =
+        Series(type, (anchorYear - 1L) * YEAR_MILLIS, cycle * YEAR_MILLIS, YEAR_MILLIS)
 
     private val SERIES: List<Series> = listOf(
         // Fixed calendar dates from the Hypixel SkyBlock wiki "Calendar and Events" page.
@@ -66,9 +80,10 @@ object SkyblockEvents {
             YEAR_MILLIS - (dayOfYear(6, 27) - dayOfYear(3, 27)),
         ),
         Series(EventType.MAYOR_TERM_CHANGE, dayOfYear(3, 27), YEAR_MILLIS, 0),
-        everyTwelveYears(EventType.YEAR_OF_THE_SEAL, YEAR_OF_THE_SEAL_ANCHOR),
-        everyTwelveYears(EventType.YEAR_OF_THE_WITCH, YEAR_OF_THE_WITCH_ANCHOR),
-        everyTwelveYears(EventType.YEAR_OF_THE_PIG, YEAR_OF_THE_PIG_ANCHOR),
+        specialYear(EventType.YEAR_OF_THE_SEAL, YEAR_OF_THE_SEAL_ANCHOR),
+        specialYear(EventType.YEAR_OF_THE_WITCH, YEAR_OF_THE_WITCH_ANCHOR),
+        specialYear(EventType.YEAR_OF_THE_PIG, YEAR_OF_THE_PIG_ANCHOR),
+        specialYear(EventType.CENTURY_CELEBRATION, CENTURY_ANCHOR, CENTURY_CYCLE),
         // Marina's perk: the first 3 days of every month.
         Series(EventType.FISHING_FESTIVAL, 0, MONTH_MILLIS, 3 * DAY_MILLIS) { it.fishingFestival },
     ) + listOf(2, 4, 6, 8, 10).map { month ->
@@ -114,6 +129,16 @@ object SkyblockEvents {
         return starts.map { SkyblockEvent(type, it, it + duration) }.filter { it.runsAtOrAfter(fromMillis) }
     }
 
+    /** Estimated SkyBlock Anniversaries (UTC) running at or after [fromMillis], soonest first. Infinite. */
+    private fun anniversariesFrom(fromMillis: Long): Sequence<SkyblockEvent> {
+        val year = Instant.ofEpochMilli(fromMillis).atOffset(ZoneOffset.UTC).year
+        return generateSequence(year) { it + 1 }.map { y ->
+            val start = LocalDate.of(y, ANNIVERSARY_MONTH, ANNIVERSARY_DAY)
+                .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            SkyblockEvent(EventType.SKYBLOCK_ANNIVERSARY, start, start + ANNIVERSARY_DAYS * REAL_DAY_MILLIS)
+        }.filter { it.runsAtOrAfter(fromMillis) }
+    }
+
     /** The one extra event Foxy's "Extra Event" perk schedules in his term (Summer 22nd), if he is mayor. */
     private fun extraEvent(perks: ActivePerks): SkyblockEvent? {
         val type = perks.extraEvent ?: return null
@@ -134,7 +159,8 @@ object SkyblockEvents {
         val windowEnd = nowMillis + windowMillis
         fun inWindow(event: SkyblockEvent) = event.startsAt < windowEnd || event.startsAt == nowMillis
         val result = SERIES.flatMap { it.occurrencesFrom(nowMillis, perks).takeWhile(::inWindow).toList() } +
-            listOfNotNull(extraEvent(perks)?.takeIf { it.runsAtOrAfter(nowMillis) && inWindow(it) })
+            listOfNotNull(extraEvent(perks)?.takeIf { it.runsAtOrAfter(nowMillis) && inWindow(it) }) +
+            anniversariesFrom(nowMillis).takeWhile(::inWindow).toList()
         return result.sortedWith(ORDER)
     }
 
@@ -152,7 +178,14 @@ object SkyblockEvents {
         require(count >= 0) { "count must not be negative: $count" }
         val result = SERIES_BY_TYPE[type].orEmpty()
             .flatMap { it.occurrencesFrom(fromMillis, perks).take(count).toList() } +
-            listOfNotNull(extraEvent(perks)?.takeIf { it.type == type && it.runsAtOrAfter(fromMillis) })
+            listOfNotNull(extraEvent(perks)?.takeIf { it.type == type && it.runsAtOrAfter(fromMillis) }) +
+            (
+                if (type == EventType.SKYBLOCK_ANNIVERSARY) {
+                    anniversariesFrom(fromMillis).take(count).toList()
+                } else {
+                    emptyList()
+                }
+            )
         return result.sortedWith(ORDER).take(count)
     }
 }

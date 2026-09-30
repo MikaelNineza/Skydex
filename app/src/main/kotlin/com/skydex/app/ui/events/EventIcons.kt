@@ -27,4 +27,6 @@ fun eventIcon(type: EventType): Int = when (type) {
     EventType.YEAR_OF_THE_SEAL -> R.drawable.event_year_of_the_seal
     EventType.YEAR_OF_THE_WITCH -> R.drawable.event_year_of_the_witch
     EventType.YEAR_OF_THE_PIG -> R.drawable.event_year_of_the_pig
+    EventType.CENTURY_CELEBRATION -> R.drawable.event_century_celebration // SkyCrypt item CLOCK
+    EventType.SKYBLOCK_ANNIVERSARY -> R.drawable.event_skyblock_anniversary // PARTY_HAT_CRAB, renders as a cake
 }

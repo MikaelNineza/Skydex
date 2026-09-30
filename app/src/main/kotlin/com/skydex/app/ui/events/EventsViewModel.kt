@@ -63,7 +63,7 @@ sealed interface EventsUiState {
         val common: List<EventCard>,
         /** Events that come at least once per Skyblock year, soonest first. */
         val seasonal: List<EventCard>,
-        /** Events that come once every few Skyblock years, soonest first. */
+        /** Events that come once every few Skyblock years or less often, soonest first. */
         val rare: List<EventCard>,
         val mayor: UiState<MayorStatus>,
         /** Jerry is mayor: perk events can't be predicted. */
@@ -189,8 +189,12 @@ class EventsViewModel internal constructor(
         val crops = live.contests.associate { it.startsAt to it.crops }
         // Ask from now + 1 so an instantaneous event at exactly now gives way to its next occurrence instead of
         // leaving the type with nothing for a tick; the filter guards against a calendar returning past events.
-        fun upcoming(type: EventType, count: Int) =
-            calendar(type, now + 1, count, perks).filter { it.startsAt > now || it.endsAt > now }
+        // Lookups stop LOOKUP_HORIZON_MILLIS ahead, except for the types in UNCAPPED.
+        fun upcoming(type: EventType, count: Int): List<SkyblockEvent> {
+            val horizon = if (type in UNCAPPED) Long.MAX_VALUE else now + LOOKUP_HORIZON_MILLIS
+            return calendar(type, now + 1, count, perks)
+                .filter { (it.startsAt > now || it.endsAt > now) && it.startsAt < horizon }
+        }
         return try {
             val cards = EventType.entries
                 .mapNotNull { type -> upcoming(type, 1).firstOrNull()?.toCard(now, crops, live.contestsLoaded) }
@@ -198,7 +202,8 @@ class EventsViewModel internal constructor(
             val detail = selected?.let { type ->
                 EventDetail(
                     type,
-                    upcoming(type, DETAIL_COUNT).map { it.toCard(now, crops, live.contestsLoaded) },
+                    upcoming(type, if (type in UNCAPPED) UNCAPPED_DETAIL_COUNT else DETAIL_COUNT)
+                        .map { it.toCard(now, crops, live.contestsLoaded) },
                 )
             }
             EventsUiState.Content(
@@ -232,6 +237,15 @@ class EventsViewModel internal constructor(
     companion object {
         /** Occurrences listed when a card is tapped. */
         const val DETAIL_COUNT = 10
+
+        /** How far ahead events are looked up: about 12 months. */
+        const val LOOKUP_HORIZON_MILLIS = 365L * 24 * 60 * 60 * 1000
+
+        /** Types shown however far ahead they are; the Century Celebration comes only every ~1.4 real years. */
+        val UNCAPPED = setOf(EventType.CENTURY_CELEBRATION)
+
+        /** Occurrences listed for an [UNCAPPED] type, which would otherwise run decades ahead. */
+        const val UNCAPPED_DETAIL_COUNT = 3
         const val LIVE_REFRESH_MILLIS = 5 * 60 * 1000L
         const val LIVE_RETRY_MILLIS = 30 * 1000L
     }
