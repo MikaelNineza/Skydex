@@ -20,6 +20,14 @@ class ApplicationTest {
     }
 
     @Test
+    fun appLatestIsOffWithoutGithubRepo() = testApplication {
+        // Test configs are empty (application.conf isn't loaded), so the route is never registered and GitHub is never called.
+        application { module() }
+
+        assertEquals(HttpStatusCode.NotFound, client.get("/v1/app/latest").status)
+    }
+
+    @Test
     fun historyEndpointIsGone() = testApplication {
         application { module() }
 

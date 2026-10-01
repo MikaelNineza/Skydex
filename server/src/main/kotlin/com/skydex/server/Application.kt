@@ -8,9 +8,12 @@ import com.skydex.server.hypixel.upstreamHttpClient
 import com.skydex.server.plugins.configureMonitoring
 import com.skydex.server.plugins.configureSerialization
 import com.skydex.server.plugins.configureStatusPages
+import com.skydex.server.releases.appReleaseSource
+import com.skydex.server.routes.appRoutes
 import com.skydex.server.routes.configurePlayerRoutes
 import com.skydex.server.routes.configureRouting
 import io.ktor.server.application.Application
+import io.ktor.server.routing.routing
 
 // Loaded by EngineMain through ktor.application.modules in application.conf.
 fun Application.module() {
@@ -19,6 +22,7 @@ fun Application.module() {
     configureStatusPages()
     configureRouting()
     val http = upstreamHttpClient()
+    appReleaseSource(http)?.let { releases -> routing { appRoutes(releases) } }
     val profileSource = hypixelProfileSource(http)
     configurePlayerRoutes(profileSource)
     configureData(CachedLiveEventSource(ElectionClient(http), EliteClient(http)))
