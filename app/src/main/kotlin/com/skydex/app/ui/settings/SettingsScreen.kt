@@ -50,6 +50,7 @@ import com.skydex.app.ui.common.PixelIcon
 import com.skydex.app.ui.common.SectionHeader
 import com.skydex.app.ui.common.SkydexCard
 import com.skydex.app.ui.common.cropIcon
+import com.skydex.app.ui.updates.UpdateSection
 import com.skydex.shared.model.Crop
 import com.skydex.shared.model.EventCategory
 import com.skydex.shared.model.EventType
@@ -159,6 +160,8 @@ fun SettingsScreen(
                 }
             }
         }
+        item { SectionHeader("App") }
+        item { UpdateSection() }
         item {
             Text(
                 "Skill, event and crop icons are item renders from SkyCrypt (sky.shiiyu.moe) of Minecraft and " +

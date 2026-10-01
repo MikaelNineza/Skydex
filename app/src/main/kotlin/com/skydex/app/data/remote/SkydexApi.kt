@@ -1,6 +1,7 @@
 package com.skydex.app.data.remote
 
 import com.skydex.shared.model.ApiError
+import com.skydex.shared.model.AppRelease
 import com.skydex.shared.model.DeviceRegistration
 import com.skydex.shared.model.JacobContest
 import com.skydex.shared.model.MayorStatus
@@ -59,6 +60,13 @@ class SkydexApi @Inject constructor(private val client: HttpClient) {
         val response = client.delete("v1/devices/${installationId.path()}")
         // Already gone is fine.
         if (response.status != HttpStatusCode.NotFound) response.bodyOrThrow<Unit>()
+    }
+
+    /** The newest published release, or null when there is none (204) or the server predates the endpoint (404). */
+    suspend fun latestRelease(): AppRelease? {
+        val response = client.get("v1/app/latest")
+        if (response.status == HttpStatusCode.NoContent || response.status == HttpStatusCode.NotFound) return null
+        return response.bodyOrThrow()
     }
 
     private fun String.path() = encodeURLPathPart()

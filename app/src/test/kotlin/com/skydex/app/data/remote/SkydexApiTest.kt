@@ -3,6 +3,7 @@ package com.skydex.app.data.remote
 import com.skydex.app.FakeServer
 import com.skydex.app.respondJson
 import com.skydex.app.samplePlayer
+import com.skydex.app.sampleRelease
 import com.skydex.shared.model.Candidate
 import com.skydex.shared.model.Crop
 import com.skydex.shared.model.DeviceRegistration
@@ -135,5 +136,34 @@ class SkydexApiTest {
         assertEquals(emptyList<Candidate>(), status.lastElectionCandidates)
         assertEquals(emptyList<Candidate>(), status.candidates)
         assertNull(status.votingYear)
+    }
+    @Test
+    fun `latest release is parsed from the app endpoint`() = runTest {
+        server.handler = { respondJson(sampleRelease) }
+
+        assertEquals(sampleRelease, server.api.latestRelease())
+        assertEquals("/v1/app/latest", server.requests.single().url.encodedPath)
+        assertEquals(HttpMethod.Get, server.requests.single().method)
+    }
+
+    @Test
+    fun `no release (204) and an older server (404) both mean no update`() = runTest {
+        server.handler = { respond("", HttpStatusCode.NoContent) }
+        assertNull(server.api.latestRelease())
+
+        server.handler = { respondJson("""{"message":"Not found"}""", HttpStatusCode.NotFound) }
+        assertNull(server.api.latestRelease())
+    }
+
+    @Test
+    fun `a gateway error from the app endpoint throws`() = runTest {
+        server.handler = { respondJson("""{"message":"Upstream service unavailable"}""", HttpStatusCode.BadGateway) }
+        try {
+            server.api.latestRelease()
+            fail("expected ApiException")
+        } catch (e: ApiException) {
+            assertEquals(HttpStatusCode.BadGateway, e.status)
+            assertEquals("Upstream service unavailable", e.message)
+        }
     }
 }

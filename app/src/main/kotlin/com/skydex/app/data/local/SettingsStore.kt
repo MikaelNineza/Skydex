@@ -79,6 +79,11 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
 
     suspend fun setFcmToken(token: String) = dataStore.edit { it[FCM_TOKEN] = token }
 
+    /** The versionCode of the update the user chose to skip; the launch banner stays hidden for it. */
+    val skippedUpdateVersionCode: Flow<Int?> = dataStore.data.map { it[SKIPPED_UPDATE] }.distinctUntilChanged()
+
+    suspend fun skipUpdate(versionCode: Int) = dataStore.edit { it[SKIPPED_UPDATE] = versionCode }
+
     /** A random id generated on first use and kept for the life of the install. */
     suspend fun installationId(): String {
         dataStore.data.first()[INSTALLATION_ID]?.let { return it }
@@ -116,5 +121,6 @@ class SettingsStore @Inject constructor(private val dataStore: DataStore<Prefere
         val JACOB_CROPS = stringSetPreferencesKey("jacob_crops")
         val FCM_TOKEN = stringPreferencesKey("fcm_token")
         val INSTALLATION_ID = stringPreferencesKey("installation_id")
+        val SKIPPED_UPDATE = intPreferencesKey("skipped_update_version_code")
     }
 }

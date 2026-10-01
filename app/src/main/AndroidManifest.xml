@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- In-app updates: Skydex installs new versions of itself downloaded from GitHub. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".SkydexApp"
@@ -36,6 +38,11 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- PackageInstaller session results for in-app updates. -->
+        <receiver
+            android:name=".updates.UpdateInstallReceiver"
+            android:exported="false" />
 
         <!-- Firebase is initialized by hand in SkydexApp, and only when the build has a config. -->
         <provider

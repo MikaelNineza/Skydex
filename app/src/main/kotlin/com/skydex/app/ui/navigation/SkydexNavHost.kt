@@ -31,6 +31,7 @@ import androidx.navigation.compose.rememberNavController
 import com.skydex.app.ui.events.EventsScreen
 import com.skydex.app.ui.profile.ProfileScreen
 import com.skydex.app.ui.settings.SettingsScreen
+import com.skydex.app.ui.updates.UpdateBanner
 import kotlinx.serialization.Serializable
 
 @Serializable data object ProfileRoute
@@ -74,11 +75,17 @@ fun SkydexNavHost() {
             }
         },
     ) { padding ->
-        NavHost(navController, startDestination = ProfileRoute, modifier = Modifier.padding(padding)) {
-            composable<ProfileRoute> { ProfileScreen() }
-            composable<EventsRoute> { EventsScreen() }
-            composable<SettingsRoute> {
-                SettingsScreen(onChangePlayer = { navController.navigateToTab(ProfileRoute) })
+        Column(Modifier.padding(padding)) {
+            // Above every tab; its view model starts the once-per-process update check. Settings shows install
+            // progress in its own update section.
+            val onSettings = backStackEntry?.destination?.hierarchy?.any { it.hasRoute(SettingsRoute::class) } == true
+            UpdateBanner(showInstallProgress = !onSettings)
+            NavHost(navController, startDestination = ProfileRoute, modifier = Modifier.weight(1f)) {
+                composable<ProfileRoute> { ProfileScreen() }
+                composable<EventsRoute> { EventsScreen() }
+                composable<SettingsRoute> {
+                    SettingsScreen(onChangePlayer = { navController.navigateToTab(ProfileRoute) })
+                }
             }
         }
     }

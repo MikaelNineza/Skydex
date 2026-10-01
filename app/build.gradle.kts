@@ -1,3 +1,4 @@
+import java.net.URI
 import java.util.Properties
 
 plugins {
@@ -17,6 +18,24 @@ val localProperties = Properties().apply {
 fun secret(name: String): String =
     localProperties.getProperty(name) ?: providers.environmentVariable(name).orNull ?: ""
 
+// Release versions come from the tag (vX.Y.Z) through the release workflow. Local builds default to 0.0.1 (code 1),
+// so any published release counts as newer when testing the update check.
+val appVersionName: String = providers.gradleProperty("skydex.versionName")
+    .orElse(providers.environmentVariable("SKYDEX_VERSION_NAME"))
+    .getOrElse("0.0.1")
+
+// Must match AppVersion in :shared (build scripts can't use project code).
+val appVersionCode: Int = Regex("""(0|[1-9]\d{0,3})\.(0|[1-9]\d?)\.(0|[1-9]\d?)""").matchEntire(appVersionName)
+    ?.destructured?.let { (major, minor, patch) -> major.toInt() * 10_000 + minor.toInt() * 100 + patch.toInt() }
+    ?.takeIf { it > 0 }
+    ?: throw GradleException("Version '$appVersionName' must be MAJOR.MINOR.PATCH, minor and patch below 100")
+
+// Where release builds find the server. Unusable values become "" so checkReleaseConfig reports them clearly
+// (a quote or backslash would otherwise break BuildConfig compilation first).
+val releaseBaseUrl: String = secret("SKYDEX_BASE_URL").trim()
+    .let { if (it.isEmpty() || it.endsWith("/")) it else "$it/" }
+    .takeUnless { url -> url.any { it == '"' || it == '\\' || it.isWhitespace() } } ?: ""
+
 android {
     namespace = "com.skydex.app"
     compileSdk {
@@ -27,8 +46,8 @@ android {
         applicationId = "com.skydex.app"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -37,14 +56,29 @@ android {
         }
     }
 
+    signingConfigs {
+        // Only when a keystore is configured; otherwise release builds come out unsigned (app-release-unsigned.apk).
+        val keystorePath = secret("SKYDEX_KEYSTORE_PATH")
+        if (keystorePath.isNotBlank()) create("release") {
+            storeFile = file(keystorePath)
+            storePassword = secret("SKYDEX_KEYSTORE_PASSWORD")
+            keyAlias = secret("SKYDEX_KEY_ALIAS")
+            keyPassword = secret("SKYDEX_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         debug {
             // `./gradlew :server:run` on this machine, forwarded by the adbReverse task below.
             buildConfigField("String", "BASE_URL", "\"http://localhost:8080/\"")
+            // Off by default: debug builds are version 0.0.1, so every published release would show up.
+            buildConfigField("boolean", "CHECK_UPDATES_ON_LAUNCH", "${secret("SKYDEX_DEBUG_UPDATE_CHECK") == "true"}")
         }
         release {
-            // TODO: point at the deployed server.
-            buildConfigField("String", "BASE_URL", "\"https://skydex.example.com/\"")
+            // From SKYDEX_BASE_URL; checkReleaseConfig below refuses to package without a real one.
+            buildConfigField("String", "BASE_URL", "\"$releaseBaseUrl\"")
+            buildConfigField("boolean", "CHECK_UPDATES_ON_LAUNCH", "true")
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = false
             }
@@ -74,6 +108,28 @@ val adbReverse = tasks.register<Exec>("adbReverse") {
 }
 tasks.matching { it.name == "assembleDebug" || it.name == "installDebug" }.configureEach {
     finalizedBy(adbReverse)
+}
+
+// Release APKs/AABs must point at a real server. Runs only when release packaging runs, so debug builds, unit tests
+// and lint work without SKYDEX_BASE_URL. Captures only a String, so it's configuration-cache safe.
+val checkReleaseConfig = tasks.register("checkReleaseConfig") {
+    val url = releaseBaseUrl
+    doLast {
+        val host = runCatching { URI(url).host?.lowercase() }.getOrNull()
+        // The reserved example domains (and their subdomains) are documentation placeholders, never a real server.
+        val placeholder = host != null && listOf("example.com", "example.org", "example.net")
+            .any { host == it || host.endsWith(".$it") }
+        if (!url.startsWith("https://") || host.isNullOrBlank() || placeholder) {
+            throw GradleException(
+                "Release builds need SKYDEX_BASE_URL=https://<your server>/ in the environment or local.properties (got '$url')."
+            )
+        }
+    }
+}
+// packageRelease writes the APK; packageReleaseBundle / signReleaseBundle write the AAB (bundleRelease only depends on them).
+val releasePackagingTasks = setOf("packageRelease", "packageReleaseBundle", "signReleaseBundle", "packageReleaseUniversalApk")
+tasks.matching { it.name in releasePackagingTasks }.configureEach {
+    dependsOn(checkReleaseConfig)
 }
 
 dependencies {

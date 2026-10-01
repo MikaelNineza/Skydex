@@ -7,6 +7,7 @@ import com.skydex.app.data.remote.SkydexApi
 import com.skydex.app.data.remote.SkydexJson
 import com.skydex.app.data.remote.createHttpClient
 import com.skydex.app.notifications.PushTokens
+import com.skydex.shared.model.AppRelease
 import com.skydex.shared.model.PlayerProfiles
 import com.skydex.shared.model.ProfileSummary
 import com.skydex.shared.model.SkillLevel
@@ -107,4 +108,16 @@ val sampleProfile = SkyblockProfile(
     skills = listOf(SkillLevel("farming", 1e7, 40, 60, 0.5)),
     slayers = emptyList(),
     fetchedAt = 1_700_000_000_000L,
+)
+
+/** A release newer than debug builds (0.0.1, code 1); its sha256 belongs to no real file. */
+val sampleRelease = AppRelease(
+    versionName = "1.2.3",
+    versionCode = 10203,
+    downloadUrl = "https://github.com/MikaelNineza/Skydex/releases/download/v1.2.3/skydex.apk",
+    releaseUrl = "https://github.com/MikaelNineza/Skydex/releases/tag/v1.2.3",
+    notes = "Fixes",
+    publishedAt = 1_790_000_000_000L,
+    sizeBytes = 4,
+    sha256 = "0".repeat(64),
 )
