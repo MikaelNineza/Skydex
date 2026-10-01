@@ -1,0 +1,244 @@
+name: Release
+
+# Push a tag like v1.2.3 to build a signed APK and publish it as the GitHub release "Skydex 1.2.3".
+# Re-running for a tag whose published release already has its APK does nothing; re-running after a partial failure
+# finishes it.
+#
+# Setup: the signing and build secrets live in the "release" environment (add required reviewers and a tag-only
+# deployment rule there), and the repository variable SKYDEX_CERT_SHA256 holds the signing certificate's SHA-256.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)release, e.g. v1.0.0"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # bash -eo pipefail
+    shell: bash
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      done: ${{ steps.existing.outputs.done }}
+      version: ${{ steps.tag.outputs.version }}
+      version_code: ${{ steps.tag.outputs.version_code }}
+    steps:
+      - name: Validate tag
+        id: tag
+        # Must match AppVersion in shared/ and appVersionCode in app/build.gradle.kts.
+        run: |
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$ ]]; then
+            echo "::error::Tag '$TAG' must look like v1.2.3 (no leading zeros, minor and patch below 100)"
+            exit 1
+          fi
+          version="${TAG#v}"
+          IFS=. read -r major minor patch <<< "$version"
+          code=$((major * 10000 + minor * 100 + patch))
+          if [ "$code" -lt 1 ]; then
+            echo "::error::v0.0.0 can't be released"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Check for an existing release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # A published release's APK is never replaced. (Drafts aren't visible with a read-only token; publish handles them.)
+        run: |
+          if json=$(gh release view "$TAG" --json isDraft,assets 2>/dev/null); then
+            if [ "$(jq -r '.isDraft' <<< "$json")" = "false" ] &&
+               jq -e '.assets[] | select(.name == "skydex.apk")' <<< "$json" > /dev/null; then
+              echo "::notice::Release $TAG is already published with skydex.apk; nothing to do."
+              echo "done=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.done != 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      VERSION_CODE: ${{ needs.check.outputs.version_code }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          # Don't save caches from a build that saw signing secrets.
+          cache-read-only: true
+
+      - name: Unit tests
+        run: ./gradlew --no-configuration-cache :shared:test :app:testDebugUnitTest
+
+      - name: Build the release APK
+        env:
+          SKYDEX_VERSION_NAME: ${{ env.VERSION }}
+          SKYDEX_KEYSTORE_BASE64: ${{ secrets.SKYDEX_KEYSTORE_BASE64 }}
+          SKYDEX_KEYSTORE_PASSWORD: ${{ secrets.SKYDEX_KEYSTORE_PASSWORD }}
+          SKYDEX_KEY_ALIAS: ${{ secrets.SKYDEX_KEY_ALIAS }}
+          SKYDEX_KEY_PASSWORD: ${{ secrets.SKYDEX_KEY_PASSWORD }}
+          SKYDEX_BASE_URL: ${{ secrets.SKYDEX_BASE_URL }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_SENDER_ID: ${{ secrets.FIREBASE_SENDER_ID }}
+        # The secrets only reach this step. No configuration cache: its entries would hold the signing passwords.
+        run: |
+          missing=0
+          for name in SKYDEX_KEYSTORE_BASE64 SKYDEX_KEYSTORE_PASSWORD SKYDEX_KEY_ALIAS SKYDEX_KEY_PASSWORD \
+                      SKYDEX_BASE_URL FIREBASE_APP_ID FIREBASE_API_KEY FIREBASE_PROJECT_ID FIREBASE_SENDER_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set in the release environment"
+              missing=1
+            fi
+          done
+          case "$SKYDEX_BASE_URL" in
+            https://*example.com*|https://*example.org*|https://*example.net*|"")
+              echo "::error::SKYDEX_BASE_URL must be your real https server URL"; missing=1 ;;
+            https://*) ;;
+            *) echo "::error::SKYDEX_BASE_URL must start with https://"; missing=1 ;;
+          esac
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+
+          export SKYDEX_KEYSTORE_PATH="$RUNNER_TEMP/skydex.jks"
+          tr -d '\r\n' <<< "$SKYDEX_KEYSTORE_BASE64" | base64 --decode > "$SKYDEX_KEYSTORE_PATH"
+          unset SKYDEX_KEYSTORE_BASE64
+          ./gradlew --no-configuration-cache :app:assembleRelease
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/skydex.jks"
+
+      - name: Verify signature and version
+        env:
+          CERT_SHA256: ${{ vars.SKYDEX_CERT_SHA256 }}
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$apk" ]; then
+            echo "::error::No signed APK at $apk (is signing configured?)"
+            exit 1
+          fi
+          expected=$(tr -d ': \r\n' <<< "$CERT_SHA256" | tr '[:upper:]' '[:lower:]')
+          if [ -z "$expected" ]; then
+            echo "::error::Set the repository variable SKYDEX_CERT_SHA256 to the release certificate's SHA-256"
+            exit 1
+          fi
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)
+          certs=$("${tools}apksigner" verify --print-certs "$apk")
+          echo "$certs"
+          if grep -qF "Signer #2" <<< "$certs"; then
+            echo "::error::The APK has more than one signer"
+            exit 1
+          fi
+          actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: *//p' <<< "$certs" | tr -d ': \r\n' | tr '[:upper:]' '[:lower:]')
+          if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            echo "::error::APK signing certificate SHA-256 '$actual' doesn't match SKYDEX_CERT_SHA256"
+            exit 1
+          fi
+          if ! "${tools}aapt2" dump badging "$apk" | grep -qF "versionCode='$VERSION_CODE' versionName='$VERSION'"; then
+            echo "::error::APK version doesn't match $TAG"
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$apk" dist/skydex.apk
+          (cd dist && sha256sum skydex.apk > skydex.apk.sha256)
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: skydex-apk
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [check, build]
+    if: needs.check.outputs.done != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      VERSION_CODE: ${{ needs.check.outputs.version_code }}
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: skydex-apk
+          path: dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd dist && sha256sum -c skydex.apk.sha256)
+          sha256=$(cut -d' ' -f1 dist/skydex.apk.sha256)
+          sha_line="SHA-256: \`$sha256\`"
+
+          # Only the highest published version is marked latest, so re-releasing an old tag can't demote a newer one.
+          tags=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1000 --json tagName -q '.[].tagName')
+          highest=0
+          while IFS= read -r t; do
+            if [[ "$t" != "$TAG" && "$t" =~ ^v(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$ ]]; then
+              code=$((BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3]))
+              if [ "$code" -gt "$highest" ]; then highest=$code; fi
+            fi
+          done <<< "$tags"
+          latest=false
+          if [ "$VERSION_CODE" -gt "$highest" ]; then latest=true; fi
+          echo "Mark as latest: $latest (highest other published versionCode: $highest)"
+
+          if json=$(gh release view "$TAG" --json isDraft,assets 2>/dev/null); then
+            draft=$(jq -r '.isDraft' <<< "$json")
+            if [ "$draft" = "false" ] && jq -e '.assets[] | select(.name == "skydex.apk")' <<< "$json" > /dev/null; then
+              echo "::notice::Release $TAG is already published with skydex.apk; not replacing it."
+              exit 0
+            fi
+            # Left over from an earlier, partly failed run (or made by hand): add the assets, fix the notes' hash,
+            # then publish it.
+            gh release upload "$TAG" dist/skydex.apk dist/skydex.apk.sha256 --clobber
+            body=$(gh release view "$TAG" --json body -q '.body')
+            if grep -qiE '^SHA-256:' <<< "$body"; then
+              body=$(sed -E "s/^SHA-256:.*$/$sha_line/I" <<< "$body")
+            else
+              body="$sha_line"$'\n\n'"$body"
+            fi
+            printf '%s\n' "$body" > "$RUNNER_TEMP/notes.md"
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+            if [ "$draft" = "true" ]; then
+              gh release edit "$TAG" --draft=false --latest="$latest"
+            fi
+          else
+            # gh uploads assets to a draft first and only then publishes, so /releases/latest never lacks the APK.
+            gh release create "$TAG" dist/skydex.apk dist/skydex.apk.sha256 \
+              --verify-tag --title "Skydex $VERSION" --latest="$latest" \
+              --notes "$sha_line" --generate-notes
+          fi

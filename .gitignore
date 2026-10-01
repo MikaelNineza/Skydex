@@ -48,3 +48,6 @@ CLAUDE.local.md
 AGENTS.md
 .claude/
 .mcp.json
+
+# Personal release checklist
+RELEASE_SETUP.md
