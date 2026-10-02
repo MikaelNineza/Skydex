@@ -10,4 +10,4 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /src/server/build/libs/*-all.jar server.jar
 EXPOSE 8080
-CMD ["java", "-jar", "server.jar"]
+CMD ["java", "-XX:MaxRAMPercentage=75", "-jar", "server.jar"]
