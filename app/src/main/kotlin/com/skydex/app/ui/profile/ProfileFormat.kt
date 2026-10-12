@@ -95,6 +95,23 @@ fun formatCoinsFloor(value: Double, target: Double): String {
 /** "212 / 289". */
 fun fairySoulsLabel(profile: SkyblockProfile): String = "${profile.fairySouls} / ${profile.fairySoulsTotal}"
 
+/** 245 -> "4:05"; negative -> "0:00". */
+fun formatCooldown(seconds: Int): String {
+    val s = seconds.coerceAtLeast(0)
+    return String.format(Locale.ROOT, "%d:%02d", s / 60, s % 60)
+}
+
+/** For screen readers: 245 -> "4 minutes 5 seconds", 60 -> "1 minute". */
+fun cooldownDescription(seconds: Int): String {
+    val s = seconds.coerceAtLeast(0)
+    val minutes = s / 60
+    val rest = s % 60
+    return listOfNotNull(
+        if (minutes > 0) "$minutes ${if (minutes == 1) "minute" else "minutes"}" else null,
+        if (rest > 0 || minutes == 0) "$rest ${if (rest == 1) "second" else "seconds"}" else null,
+    ).joinToString(" ")
+}
+
 /** Slayer boss names as shown in game, e.g. "zombie" -> "Revenant". */
 fun slayerName(boss: String): String = when (boss) {
     "zombie" -> "Revenant"

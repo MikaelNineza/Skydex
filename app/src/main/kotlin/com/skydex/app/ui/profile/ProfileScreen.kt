@@ -23,11 +23,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,24 +62,36 @@ import com.skydex.shared.model.SkillLevel
 import com.skydex.shared.model.SkyblockProfile
 import com.skydex.shared.model.SlayerLevel
 import java.util.Locale
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun ProfileScreen(modifier: Modifier = Modifier, viewModel: ProfileViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val search by viewModel.search.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    // Read lazily, inside the header only, so the list doesn't recompose every second of the countdown.
+    val cooldownSeconds by viewModel.cooldownSeconds.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    when (val s = state) {
-        ProfileUiState.Loading -> LoadingView(modifier)
-        ProfileUiState.NoSelection -> PlayerSearch(search, viewModel::search, viewModel::pick, modifier)
-        is ProfileUiState.Error -> MessageView(
-            title = "Couldn't load the profile",
-            body = s.message,
-            actionLabel = "Retry",
-            onAction = viewModel::refresh,
-            modifier = modifier,
-        )
-        is ProfileUiState.Content -> ProfileContent(s, isRefreshing, viewModel::refresh, modifier)
+    LaunchedEffect(viewModel) {
+        viewModel.refreshRejected.collectLatest { seconds ->
+            snackbarHostState.showSnackbar("Profile can refresh again in ${formatCooldown(seconds)}")
+        }
+    }
+
+    Box(modifier.fillMaxSize()) {
+        when (val s = state) {
+            ProfileUiState.Loading -> LoadingView()
+            ProfileUiState.NoSelection -> PlayerSearch(search, viewModel::search, viewModel::pick)
+            is ProfileUiState.Error -> MessageView(
+                title = "Couldn't load the profile",
+                body = s.message,
+                actionLabel = "Retry",
+                onAction = viewModel::refresh,
+            )
+            is ProfileUiState.Content -> ProfileContent(s, isRefreshing, { cooldownSeconds }, viewModel::refresh)
+        }
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -84,6 +100,7 @@ fun ProfileScreen(modifier: Modifier = Modifier, viewModel: ProfileViewModel = h
 private fun ProfileContent(
     state: ProfileUiState.Content,
     isRefreshing: Boolean,
+    cooldownSeconds: () -> Int,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -95,7 +112,7 @@ private fun ProfileContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            item { Header(profile, state.offline) }
+            item { Header(profile, state.offline, cooldownSeconds) }
             item { SectionHeader("Skills") }
             item(key = "skills") { SkillGrid(profile.skills, skillsOff) }
             item { StatsStrip(profile, skillsOff) }
@@ -112,7 +129,7 @@ private fun ProfileContent(
 }
 
 @Composable
-private fun Header(profile: SkyblockProfile, offline: Boolean) {
+private fun Header(profile: SkyblockProfile, offline: Boolean, cooldownSeconds: () -> Int) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -141,6 +158,18 @@ private fun Header(profile: SkyblockProfile, offline: Boolean) {
             }
             Spacer(Modifier.width(12.dp))
             PlayerFace(profile.face)
+        }
+        val seconds = cooldownSeconds()
+        if (!offline && seconds > 0) {
+            // Not a live region: a per-second announcement would be noise.
+            Text(
+                "Refresh available in ${formatCooldown(seconds)}",
+                Modifier.padding(top = 4.dp).clearAndSetSemantics {
+                    contentDescription = "Profile refresh available in ${cooldownDescription(seconds)}"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (offline) {
             SkydexCard(Modifier.padding(top = 8.dp).fillMaxWidth()) {

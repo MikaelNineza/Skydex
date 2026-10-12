@@ -187,4 +187,23 @@ class ProfileFormatTest {
         assertEquals("2.4K XP" to null, slayerXpLabel(SlayerLevel("vampire", 2_400, 5)))
         assertEquals("123.4K XP" to null, slayerXpLabel(SlayerLevel("newboss", 123_400, 3)))
     }
+
+    @Test
+    fun `cooldown reads as minutes and padded seconds`() {
+        assertEquals("5:00", formatCooldown(300))
+        assertEquals("1:05", formatCooldown(65))
+        assertEquals("0:09", formatCooldown(9))
+        assertEquals("0:00", formatCooldown(0))
+        assertEquals("0:00", formatCooldown(-5))
+    }
+
+    @Test
+    fun `cooldown description is a sentence with singular and plural units`() {
+        assertEquals("1 second", cooldownDescription(1))
+        assertEquals("30 seconds", cooldownDescription(30))
+        assertEquals("1 minute", cooldownDescription(60))
+        assertEquals("2 minutes 5 seconds", cooldownDescription(125))
+        assertEquals("1 minute 1 second", cooldownDescription(61))
+        assertEquals("0 seconds", cooldownDescription(0))
+    }
 }
